@@ -1,23 +1,38 @@
 # Inem Acquire
 
-A customer acquisition workspace built with React and Vite, with a public website, onboarding, sales diagnosis, prospect discovery, outreach, and pipeline screens.
+A multi-organization customer acquisition platform with a React frontend, a Node API, and Supabase authentication, PostgreSQL, private file storage and Edge Functions.
 
-## Run locally
+## Start locally
 
 ```sh
 npm ci
+# Configure server values in .env.local using .env.example.
 npm run dev
 ```
 
-## Production build
+Open http://127.0.0.1:5173. Sign up, verify your email, then create an organization.
+
+## Connected core
+
+- HttpOnly cookie authentication and verified-email registration.
+- Separate organization ownership, admin, manager, member and viewer roles.
+- A verified platform-owner identity with time-limited, audited organization support access.
+- Persistent offers, ideal customer profiles, prospects, contacts, lists, campaigns, deals, tasks and reports.
+- CSV imports/exports, private company documents, invitations and an audit trail.
+- Record-based dashboards, a rules-based sales diagnosis and a sourced workspace advisor.
+- Approval-gated email delivery and signed payment/email webhook adapters, ready for provider configuration.
+
+All 25 application tables use row-level security. The core Edge Functions and schema are deployed to Supabase. The local application is connected; a public frontend deployment and external provider activation are separate next steps.
+
+## Verify
 
 ```sh
+npm test
+npm run test:integration
+node tests/browser.js
 npm run build
-npm run preview
 ```
 
-## Current status
+Integration tests use uniquely named temporary accounts and clean up their own records. They do not send campaign mail or charge cards.
 
-The interface uses illustrative data. Authentication, database persistence, and outbound delivery are not connected yet. Task completion and other preview interactions use local component state.
-
-Keep service credentials in local environment files; never commit database passwords or privileged API keys.
+See [backend operations](docs/BACKEND.md) for API routes, roles, deployment, provider setup, and operational limits. Secrets belong in server environment variables, never in GitHub or browser bundles.

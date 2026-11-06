@@ -1,86 +1,1315 @@
-import {AnimatedPreview} from './PlatformMotion';
-import WorkflowPreview from './WorkflowPreview';
-import React,{useMemo,useState} from 'react';
-import {Link,NavLink,Navigate,Route,Routes,useLocation,useNavigate} from 'react-router-dom';
-import {Activity,ArrowRight,BarChart3,Bell,BookOpen,BriefcaseBusiness,Building2,CalendarDays,Check,CheckCircle2,ChevronDown,ChevronRight,CircleDollarSign,ClipboardCheck,Clock3,Command,ContactRound,CreditCard,Database,FileBarChart2,FileText,Filter,Globe2,Inbox,LayoutDashboard,Lightbulb,ListChecks,LoaderCircle,LockKeyhole,Mail,Menu,MessageSquareText,MoreHorizontal,PanelLeftClose,Plus,RefreshCcw,Search,Send,Settings,ShieldCheck,Target,TrendingUp,UserPlus,Users,WalletCards,X,Zap} from 'lucide-react';
+import { AuthPage, SetupPage, LiveDemoForm } from "./live/AuthPages";
+import { RequireAuth } from "./live/AuthContext";
+import { LiveWorkspace } from "./live/Workspace";
+import { AnimatedPreview } from "./PlatformMotion";
+import WorkflowPreview from "./WorkflowPreview";
+import React, { useMemo, useState } from "react";
+import {
+  Link,
+  NavLink,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import {
+  Activity,
+  ArrowRight,
+  BarChart3,
+  Bell,
+  BookOpen,
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  CircleDollarSign,
+  ClipboardCheck,
+  Clock3,
+  Command,
+  ContactRound,
+  CreditCard,
+  Database,
+  FileBarChart2,
+  FileText,
+  Filter,
+  Globe2,
+  Inbox,
+  LayoutDashboard,
+  Lightbulb,
+  ListChecks,
+  LoaderCircle,
+  LockKeyhole,
+  Mail,
+  Menu,
+  MessageSquareText,
+  MoreHorizontal,
+  PanelLeftClose,
+  Plus,
+  RefreshCcw,
+  Search,
+  Send,
+  Settings,
+  ShieldCheck,
+  Target,
+  TrendingUp,
+  UserPlus,
+  Users,
+  WalletCards,
+  X,
+  Zap,
+} from "lucide-react";
 
-const stockTeam='https://images.pexels.com/photos/3869649/pexels-photo-3869649.jpeg?auto=compress&cs=tinysrgb&w=1800';
-const stockFounder='https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&q=85&w=1600';
-const stockFocus='https://images.pexels.com/photos/5668845/pexels-photo-5668845.jpeg?auto=compress&cs=tinysrgb&w=1400';
+const stockTeam =
+  "https://images.pexels.com/photos/3869649/pexels-photo-3869649.jpeg?auto=compress&cs=tinysrgb&w=1800";
+const stockFounder =
+  "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&q=85&w=1600";
+const stockFocus =
+  "https://images.pexels.com/photos/5668845/pexels-photo-5668845.jpeg?auto=compress&cs=tinysrgb&w=1400";
 
-const green='#2557d6';
-const money=new Intl.NumberFormat('en-NG',{style:'currency',currency:'NGN',notation:'compact',maximumFractionDigits:1});
-const routes={
-  public:['/','/how-it-works','/features','/pricing','/solutions','/solutions/b2b-saas','/solutions/agencies','/solutions/service-businesses','/book-demo','/contact','/about','/blog','/security','/privacy','/terms','/acceptable-use','/data-processing'],
-  auth:['/signup','/login','/verify-email','/forgot-password','/reset-password','/invite/team'],
-  onboarding:['/onboarding/welcome','/onboarding/company','/onboarding/offer','/onboarding/customers','/onboarding/sales','/onboarding/goals','/onboarding/data','/onboarding/review','/onboarding/complete']
+const green = "#2557d6";
+const money = new Intl.NumberFormat("en-NG", {
+  style: "currency",
+  currency: "NGN",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+const routes = {
+  public: [
+    "/",
+    "/how-it-works",
+    "/features",
+    "/pricing",
+    "/solutions",
+    "/solutions/b2b-saas",
+    "/solutions/agencies",
+    "/solutions/service-businesses",
+    "/book-demo",
+    "/contact",
+    "/about",
+    "/blog",
+    "/security",
+    "/privacy",
+    "/terms",
+    "/acceptable-use",
+    "/data-processing",
+  ],
+  auth: [
+    "/signup",
+    "/login",
+    "/verify-email",
+    "/forgot-password",
+    "/reset-password",
+    "/invite/team",
+  ],
+  onboarding: [
+    "/onboarding/welcome",
+    "/onboarding/company",
+    "/onboarding/offer",
+    "/onboarding/customers",
+    "/onboarding/sales",
+    "/onboarding/goals",
+    "/onboarding/data",
+    "/onboarding/review",
+    "/onboarding/complete",
+  ],
 };
-const sideGroups=[
- ['Workspace',[['Overview','/app/dashboard',LayoutDashboard],['Diagnosis','/app/diagnosis',Lightbulb],['Ideal customers','/app/ideal-customers',Target],['Discover prospects','/app/prospects',Search]]],
- ['Engage',[['Contacts','/app/contacts',ContactRound],['Lists','/app/lists',ListChecks],['Campaigns','/app/campaigns',Send],['Inbox','/app/inbox',Inbox]]],
- ['Convert',[['Pipeline','/app/pipeline',BriefcaseBusiness],['Deals','/app/deals',CircleDollarSign],['Tasks','/app/tasks',ClipboardCheck]]],
- ['Measure',[['Analytics','/app/analytics',BarChart3],['Reports','/app/reports',FileBarChart2]]],
-];
-const appRoutes=['company','offers','diagnosis','ideal-customers','prospects','contacts','lists','campaigns','inbox','pipeline','deals','tasks','analytics','reports','settings','billing','admin','ai-advisor','integrations','team'];
-const pageMeta={
- company:['Company profile','Keep the company context behind every recommendation accurate.'],offers:['Offers','Manage products and services with distinct targeting and messaging.'],diagnosis:['Sales diagnosis','Find the constraints slowing acquisition, with evidence and next actions.'],'ideal-customers':['Ideal customers','Define the companies and decision-makers most likely to buy.'],prospects:['Prospect discovery','Search, score and qualify companies against a selected ICP.'],contacts:['Contacts','Keep verified decision-makers and engagement history in one place.'],lists:['Lists','Organize accounts and contacts into focused working sets.'],campaigns:['Campaigns','Create, approve and measure targeted outreach.'],inbox:['Inbox','Handle replies and move promising conversations forward.'],pipeline:['Pipeline','See every opportunity and the action needed to advance it.'],deals:['Deals','Track commercial details, evidence and outcomes.'],tasks:['Tasks & follow-ups','Keep the team focused on the next best action.'],analytics:['Sales analytics','Measure the complete path from research to verified revenue.'],reports:['Reports','Build and export decision-ready sales reports.'],settings:['Workspace settings','Manage profile, team, permissions and integrations.'],billing:['Plans & billing','Manage subscription, usage and payment details.'],admin:['Platform administration','Monitor workspaces, usage, jobs and operational health.'],'ai-advisor':['AI sales advisor','Ask questions across authorized sales data and get sourced answers.'],integrations:['Integrations','Connect the tools that power your sales workflow.'],team:['Team & permissions','Invite teammates and control workspace access.']
-};
-const companies=[['Nomba','Financial services','Nigeria','92','Strong'],['SeamlessHR','HR software','Nigeria','89','Strong'],['Moniepoint','Fintech','Nigeria','86','Strong'],['Flutterwave','Payments','Nigeria','78','Possible'],['Helium Health','Healthtech','Nigeria','76','Possible']];
-const contacts=[['Dami O.','Head of Partnerships','Nomba','Verified'],['Fiyin K.','VP, People','SeamlessHR','Verified'],['Uche A.','Director, Operations','Moniepoint','Needs review'],['Amaka N.','Head of Growth','Flutterwave','Verified']];
-const tasks=[['Review Nomba research','Today','High','Tomi'],['Approve HR leaders campaign','Today','High','You'],['Follow up with Dami O.','Tomorrow','Medium','Tomi'],['Prepare SeamlessHR proposal','Nov 9','Medium','Chidi']];
+function Brand({ compact = false }) {
+  return (
+    <Link
+      className={"brand " + (compact ? "compactBrand" : "")}
+      to="/"
+      aria-label="Inem Acquire home"
+    >
+      {compact ? (
+        <img
+          className="brandSymbol"
+          src="/brand/symbol.svg"
+          alt="Inem Acquire"
+        />
+      ) : (
+        <>
+          <img
+            className="brandLogo colorLogo"
+            src="/brand/color.svg"
+            alt="Inem Acquire"
+          />
+          <img
+            className="brandLogo whiteLogo"
+            src="/brand/white.svg"
+            alt=""
+            aria-hidden="true"
+          />
+        </>
+      )}
+    </Link>
+  );
+}
+function Pill({ children, tone = "neutral" }) {
+  return <span className={"pill " + tone}>{children}</span>;
+}
+function Button({
+  children,
+  kind = "primary",
+  icon: Icon,
+  as: As = "button",
+  ...p
+}) {
+  return (
+    <As className={"btn " + kind} {...p}>
+      {Icon && <Icon size={16} />}
+      <span>{children}</span>
+    </As>
+  );
+}
+function PublicNav({ dark = false, onePage = false }) {
+  const [open, setOpen] = useState(false);
+  const items = [
+    ["How it works", "how-it-works"],
+    ["Features", "features"],
+    ["Solutions", "solutions"],
+    ["Pricing", "pricing"],
+  ];
+  return (
+    <header className={"publicNav " + (dark ? "darkNav" : "")}>
+      <Brand />
+      <nav className={open ? "open" : ""}>
+        {items.map(([label, id]) =>
+          onePage ? (
+            <a href={"#" + id} key={id} onClick={() => setOpen(false)}>
+              {label}
+            </a>
+          ) : (
+            <NavLink to={"/" + id} key={id}>
+              {label}
+            </NavLink>
+          ),
+        )}
+      </nav>
+      <div className="navActions">
+        <Link to="/login" className="textLink">
+          Log in
+        </Link>
+        <Button as={Link} to="/signup">
+          Get started <ArrowRight size={15} />
+        </Button>
+        <button
+          aria-label="Toggle navigation"
+          className="mobileMenu"
+          onClick={() => setOpen(!open)}
+        >
+          {open ? <X /> : <Menu />}
+        </button>
+      </div>
+    </header>
+  );
+}
+function PublicFooter() {
+  return (
+    <footer>
+      <div>
+        <Brand />
+        <p>Turn evidence into a more predictable sales process.</p>
+      </div>
+      <div>
+        <b>Platform</b>
+        <Link to="/features">Features</Link>
+        <Link to="/pricing">Pricing</Link>
+        <Link to="/security">Security</Link>
+      </div>
+      <div>
+        <b>Company</b>
+        <Link to="/about">About</Link>
+        <Link to="/blog">Resources</Link>
+        <Link to="/contact">Contact</Link>
+      </div>
+      <div>
+        <b>Legal</b>
+        <Link to="/privacy">Privacy</Link>
+        <Link to="/terms">Terms</Link>
+        <Link to="/acceptable-use">Acceptable use</Link>
+      </div>
+    </footer>
+  );
+}
+function MiniProduct() {
+  return (
+    <div className="productPreview">
+      <div className="previewTop">
+        <span>
+          <i />
+          Acquisition overview
+        </span>
+        <Pill tone="green">Live workspace</Pill>
+      </div>
+      <div className="previewGrid">
+        <div className="previewSide">
+          <span className="active" />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="previewMain">
+          <div className="previewGreeting">
+            <div>
+              <small>GOOD MORNING, ADA</small>
+              <strong>Focus on the deals closest to a decision.</strong>
+            </div>
+            <Link to="/app/pipeline" className="previewPipelineLink">
+              View pipeline
+            </Link>
+          </div>
+          <div className="miniStats">
+            <div>
+              <small>Qualified pipeline</small>
+              <b>₦42.8M</b>
+              <em>↑ 18%</em>
+            </div>
+            <div>
+              <small>Meetings booked</small>
+              <b>24</b>
+              <em>↑ 6</em>
+            </div>
+            <div>
+              <small>Reply rate</small>
+              <b>12.4%</b>
+              <em>↑ 2.1%</em>
+            </div>
+          </div>
+          <div className="miniChart">
+            <div>
+              <small>Pipeline created</small>
+              <b>₦31.4M</b>
+            </div>
+            <svg viewBox="0 0 500 100" preserveAspectRatio="none">
+              <path
+                d="M0 90 C70 75,80 88,145 54 S250 70,305 38 S420 48,500 10"
+                fill="none"
+                stroke={green}
+                strokeWidth="3"
+              />
+              <path
+                d="M0 90 C70 75,80 88,145 54 S250 70,305 38 S420 48,500 10 L500 100 L0 100Z"
+                fill="url(#g)"
+              />
+              <defs>
+                <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+                  <stop stopColor={green} stopOpacity=".22" />
+                  <stop offset="1" stopColor={green} stopOpacity="0" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function Home() {
+  return (
+    <div className="marketingSite">
+      <PublicNav dark onePage />
+      <div
+        className="heroFrame"
+        style={{ "--hero-image": `url(${stockTeam})` }}
+      >
+        <section className="humanHero">
+          <div className="heroCopy">
+            <span className="heroKicker">
+              A clearer way to acquire customers
+            </span>
+            <h1>
+              Your next customer.
+              <br />
+              Your next big move.
+            </h1>
+            <p>
+              Find the right companies, start better conversations, and turn
+              promising opportunities into customers. All in one connected
+              workspace.
+            </p>
+            <a className="heroExplore" href="#features">
+              Meet your new sales workspace <ArrowRight size={18} />
+            </a>
+          </div>
+          <HeroSignup />
+        </section>
+        <div className="heroBottom">
+          <span>
+            <CheckCircle2 />
+            Research with evidence
+          </span>
+          <span>
+            <CheckCircle2 />
+            Outreach you control
+          </span>
+          <span>
+            <CheckCircle2 />
+            Every opportunity connected
+          </span>
+        </div>
+      </div>
+      <main className="homeMain">
+        <section className="acquireIntro">
+          <span className="blueKicker">Less guesswork. More momentum.</span>
+          <h2>
+            Good sales starts
+            <br />
+            with a clear next step.
+          </h2>
+          <p>
+            From your first prospect to your next closed deal, give your team a
+            shared view of what matters.
+          </p>
+        </section>
+        <WorkspaceShowcase />
+        <DecisionJourney />
+        <OnePageSolutions />
+        <CapabilitySection />
+        <OnePagePricing />
+        <FaqSection />
+        <DemoSection />
+        <section className="closing">
+          <span className="blueKicker">Make your next move</span>
+          <h2>
+            Great customers are out there.
+            <br />
+            Go find yours.
+          </h2>
+          <p>Bring your research, outreach and pipeline together.</p>
+          <Button as={Link} to="/signup">
+            Get started free <ArrowRight size={16} />
+          </Button>
+        </section>
+      </main>
+      <PublicFooter />
+    </div>
+  );
+}
+function HeroSignup() {
+  const [email, setEmail] = useState("");
+  const navigate = useNavigate();
+  return (
+    <form
+      className="heroSignup"
+      onSubmit={(e) => {
+        e.preventDefault();
+        navigate("/signup?email=" + encodeURIComponent(email));
+      }}
+    >
+      <span className="signupEyebrow">YOUR NEXT CHAPTER STARTS HERE</span>
+      <h2>Make room for growth.</h2>
+      <p>
+        Build a sales process that moves
+        <br />
+        with your ambition.
+      </p>
+      <label htmlFor="hero-email">Work email</label>
+      <input
+        id="hero-email"
+        type="email"
+        autoComplete="email"
+        placeholder="you@company.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
+      <Button>
+        Get started free <ArrowRight size={17} />
+      </Button>
+      <div className="signupPerks">
+        <span>
+          <Check size={14} />
+          14-day trial
+        </span>
+        <span>
+          <Check size={14} />
+          No card required
+        </span>
+      </div>
+      <small>
+        By continuing, you agree to our <Link to="/terms">Terms</Link> and{" "}
+        <Link to="/privacy">Privacy Policy</Link>.
+      </small>
+      <div className="signupLogin">
+        Already have a workspace?{" "}
+        <Link to="/login">
+          Log in <ArrowRight size={13} />
+        </Link>
+      </div>
+    </form>
+  );
+}
+function WorkspaceShowcase() {
+  const [active, setActive] = useState(0);
+  const options = [
+    [
+      "Understand",
+      Lightbulb,
+      "See what is holding growth back.",
+      "Bring your company, offer and customer context into a diagnosis your team can act on.",
+      "/app/diagnosis",
+    ],
+    [
+      "Discover",
+      Search,
+      "Find the accounts worth your time.",
+      "Focus your research on companies that match your ideal customer, with evidence behind every score.",
+      "/app/prospects",
+    ],
+    [
+      "Engage",
+      Send,
+      "Start a conversation with context.",
+      "Keep your messages relevant, your follow-ups timely and your team in control of every send.",
+      "/app/campaigns",
+    ],
+    [
+      "Convert",
+      BriefcaseBusiness,
+      "Give every opportunity a next step.",
+      "Keep conversations, tasks and deal evidence connected as customers move through your pipeline.",
+      "/app/pipeline",
+    ],
+  ];
+  const selected = options[active];
+  return (
+    <section className="workspaceShowcase" id="features">
+      <div className="showcaseHeading">
+        <span className="blueKicker">One workspace. Every next move.</span>
+        <h2>Meet your acquisition advantage.</h2>
+      </div>
+      <div
+        className="showcaseTabs"
+        role="tablist"
+        aria-label="Explore the workflow"
+      >
+        {options.map(([label, Icon], i) => (
+          <button
+            id={"workflow-tab-" + i}
+            role="tab"
+            aria-selected={active === i}
+            aria-controls="workflow-panel"
+            tabIndex={active === i ? 0 : -1}
+            key={label}
+            onClick={() => setActive(i)}
+            onKeyDown={(e) => {
+              if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+                e.preventDefault();
+                const next =
+                  e.key === "Home"
+                    ? 0
+                    : e.key === "End"
+                      ? 3
+                      : (active + (e.key === "ArrowRight" ? 1 : 3)) % 4;
+                setActive(next);
+                document.getElementById("workflow-tab-" + next)?.focus();
+              }
+            }}
+          >
+            <Icon size={19} />
+            {label}
+          </button>
+        ))}
+      </div>
+      <div
+        className="showcaseStage"
+        id="workflow-panel"
+        role="tabpanel"
+        aria-labelledby={"workflow-tab-" + active}
+      >
+        <div className="showcaseText">
+          <span>0{active + 1} / THE CONNECTED WORKFLOW</span>
+          <h3>{selected[2]}</h3>
+          <p>{selected[3]}</p>
+          <Link to={selected[4]}>
+            Explore {selected[0].toLowerCase()} <ArrowRight size={17} />
+          </Link>
+        </div>
+        <div className="showcaseProduct">
+          <span className="previewCaption">
+            Illustrative workspace · sample data
+          </span>
+          <AnimatedPreview previewKey={active}>
+            <WorkflowPreview active={active} />
+          </AnimatedPreview>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-function Brand({compact=false}){return <Link className={'brand '+(compact?'compactBrand':'')} to="/" aria-label="Inem Acquire home">{compact?<img className="brandSymbol" src="/brand/symbol.svg" alt="Inem Acquire"/>:<><img className="brandLogo colorLogo" src="/brand/color.svg" alt="Inem Acquire"/><img className="brandLogo whiteLogo" src="/brand/white.svg" alt="" aria-hidden="true"/></>}</Link>}
-function Pill({children,tone='neutral'}){return <span className={'pill '+tone}>{children}</span>}
-function Button({children,kind='primary',icon:Icon,as:As='button',...p}){return <As className={'btn '+kind} {...p}>{Icon&&<Icon size={16}/>}<span>{children}</span></As>}
-function PublicNav({dark=false,onePage=false}){const [open,setOpen]=useState(false);const items=[['How it works','how-it-works'],['Features','features'],['Solutions','solutions'],['Pricing','pricing']];return <header className={'publicNav '+(dark?'darkNav':'')}><Brand/><nav className={open?'open':''}>{items.map(([label,id])=>onePage?<a href={'#'+id} key={id} onClick={()=>setOpen(false)}>{label}</a>:<NavLink to={'/'+id} key={id}>{label}</NavLink>)}</nav><div className="navActions"><Link to="/login" className="textLink">Log in</Link><Button as={Link} to="/signup">Get started <ArrowRight size={15}/></Button><button aria-label="Toggle navigation" className="mobileMenu" onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button></div></header>}
-function PublicFooter(){return <footer><div><Brand/><p>Turn evidence into a more predictable sales process.</p></div><div><b>Platform</b><Link to="/features">Features</Link><Link to="/pricing">Pricing</Link><Link to="/security">Security</Link></div><div><b>Company</b><Link to="/about">About</Link><Link to="/blog">Resources</Link><Link to="/contact">Contact</Link></div><div><b>Legal</b><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/acceptable-use">Acceptable use</Link></div></footer>}
-function MiniProduct(){return <div className="productPreview"><div className="previewTop"><span><i/>Acquisition overview</span><Pill tone="green">Live workspace</Pill></div><div className="previewGrid"><div className="previewSide"><span className="active"/><span/><span/><span/><span/></div><div className="previewMain"><div className="previewGreeting"><div><small>GOOD MORNING, ADA</small><strong>Focus on the deals closest to a decision.</strong></div><Link to="/app/pipeline" className="previewPipelineLink">View pipeline</Link></div><div className="miniStats"><div><small>Qualified pipeline</small><b>₦42.8M</b><em>↑ 18%</em></div><div><small>Meetings booked</small><b>24</b><em>↑ 6</em></div><div><small>Reply rate</small><b>12.4%</b><em>↑ 2.1%</em></div></div><div className="miniChart"><div><small>Pipeline created</small><b>₦31.4M</b></div><svg viewBox="0 0 500 100" preserveAspectRatio="none"><path d="M0 90 C70 75,80 88,145 54 S250 70,305 38 S420 48,500 10" fill="none" stroke={green} strokeWidth="3"/><path d="M0 90 C70 75,80 88,145 54 S250 70,305 38 S420 48,500 10 L500 100 L0 100Z" fill="url(#g)"/><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop stopColor={green} stopOpacity=".22"/><stop offset="1" stopColor={green} stopOpacity="0"/></linearGradient></defs></svg></div></div></div></div>}
-function Home(){return <div className="marketingSite"><PublicNav dark onePage/><div className="heroFrame" style={{'--hero-image':`url(${stockTeam})`}}><section className="humanHero"><div className="heroCopy"><span className="heroKicker">A clearer way to acquire customers</span><h1>Your next customer.<br/>Your next big move.</h1><p>Find the right companies, start better conversations, and turn promising opportunities into customers. All in one connected workspace.</p><a className="heroExplore" href="#features">Meet your new sales workspace <ArrowRight size={18}/></a></div><HeroSignup/></section><div className="heroBottom"><span><CheckCircle2/>Research with evidence</span><span><CheckCircle2/>Outreach you control</span><span><CheckCircle2/>Every opportunity connected</span></div></div><main className="homeMain"><section className="acquireIntro"><span className="blueKicker">Less guesswork. More momentum.</span><h2>Good sales starts<br/>with a clear next step.</h2><p>From your first prospect to your next closed deal, give your team a shared view of what matters.</p></section><WorkspaceShowcase/><DecisionJourney/><OnePageSolutions/><CapabilitySection/><OnePagePricing/><FaqSection/><DemoSection/><section className="closing"><span className="blueKicker">Make your next move</span><h2>Great customers are out there.<br/>Go find yours.</h2><p>Bring your research, outreach and pipeline together.</p><Button as={Link} to="/signup">Get started free <ArrowRight size={16}/></Button></section></main><PublicFooter/></div>}
-function HeroSignup(){const [email,setEmail]=useState('');const navigate=useNavigate();return <form className="heroSignup" onSubmit={e=>{e.preventDefault();navigate('/signup?email='+encodeURIComponent(email))}}><span className="signupEyebrow">YOUR NEXT CHAPTER STARTS HERE</span><h2>Make room for growth.</h2><p>Build a sales process that moves<br/>with your ambition.</p><label htmlFor="hero-email">Work email</label><input id="hero-email" type="email" autoComplete="email" placeholder="you@company.com" value={email} onChange={e=>setEmail(e.target.value)} required/><Button>Get started free <ArrowRight size={17}/></Button><div className="signupPerks"><span><Check size={14}/>14-day trial</span><span><Check size={14}/>No card required</span></div><small>By continuing, you agree to our <Link to="/terms">Terms</Link> and <Link to="/privacy">Privacy Policy</Link>.</small><div className="signupLogin">Already have a workspace? <Link to="/login">Log in <ArrowRight size={13}/></Link></div></form>}
-function WorkspaceShowcase(){const [active,setActive]=useState(0);const options=[['Understand',Lightbulb,'See what is holding growth back.','Bring your company, offer and customer context into a diagnosis your team can act on.','/app/diagnosis'],['Discover',Search,'Find the accounts worth your time.','Focus your research on companies that match your ideal customer, with evidence behind every score.','/app/prospects'],['Engage',Send,'Start a conversation with context.','Keep your messages relevant, your follow-ups timely and your team in control of every send.','/app/campaigns'],['Convert',BriefcaseBusiness,'Give every opportunity a next step.','Keep conversations, tasks and deal evidence connected as customers move through your pipeline.','/app/pipeline']];const selected=options[active];return <section className="workspaceShowcase" id="features"><div className="showcaseHeading"><span className="blueKicker">One workspace. Every next move.</span><h2>Meet your acquisition advantage.</h2></div><div className="showcaseTabs" role="tablist" aria-label="Explore the workflow">{options.map(([label,Icon],i)=><button id={'workflow-tab-'+i} role="tab" aria-selected={active===i} aria-controls="workflow-panel" tabIndex={active===i?0:-1} key={label} onClick={()=>setActive(i)} onKeyDown={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?3:(active+(e.key==='ArrowRight'?1:3))%4;setActive(next);document.getElementById('workflow-tab-'+next)?.focus()}}}><Icon size={19}/>{label}</button>)}</div><div className="showcaseStage" id="workflow-panel" role="tabpanel" aria-labelledby={'workflow-tab-'+active}><div className="showcaseText"><span>0{active+1} / THE CONNECTED WORKFLOW</span><h3>{selected[2]}</h3><p>{selected[3]}</p><Link to={selected[4]}>Explore {selected[0].toLowerCase()} <ArrowRight size={17}/></Link></div><div className="showcaseProduct"><span className="previewCaption">Illustrative workspace · sample data</span><AnimatedPreview previewKey={active}><WorkflowPreview active={active}/></AnimatedPreview></div></div></section>}
+function DecisionJourney() {
+  return (
+    <section className="decisionJourney" id="how-it-works">
+      <div className="journeyIntro">
+        <span className="blueKicker">From signal to next move</span>
+        <h2>Your team should never have to guess what matters today.</h2>
+        <p>
+          Inem watches the handoffs between research, outreach and pipeline,
+          then turns scattered activity into one decision your team can act on.
+        </p>
+        <a href="#demo">
+          See it with your sales process <ArrowRight size={15} />
+        </a>
+      </div>
+      <div className="journeyCanvas">
+        <header>
+          <span>
+            <i />
+            Live account story
+          </span>
+          <b>Meridian Cloud</b>
+          <small>Updated 8 minutes ago</small>
+        </header>
+        <div className="journeySignal">
+          <span className="journeyLabel">01 · Notice</span>
+          <div>
+            <b>Pricing intent is rising</b>
+            <p>
+              Four people from Meridian revisited pricing and security pages
+              this week.
+            </p>
+          </div>
+          <span className="signalCount">4 visits</span>
+        </div>
+        <div className="journeyThread">
+          <i />
+          <i />
+          <i />
+        </div>
+        <div className="journeySignal decision">
+          <span className="journeyLabel">02 · Decide</span>
+          <div>
+            <b>This account is worth attention</b>
+            <p>
+              It matches your enterprise ICP, has an active cloud migration and
+              no open opportunity.
+            </p>
+            <div className="evidenceChips">
+              <span>92 fit score</span>
+              <span>Verified signal</span>
+              <span>High confidence</span>
+            </div>
+          </div>
+        </div>
+        <div className="journeyThread">
+          <i />
+          <i />
+          <i />
+        </div>
+        <div className="journeySignal action">
+          <span className="journeyLabel">03 · Act</span>
+          <div>
+            <b>Open a conversation today</b>
+            <p>
+              Reach the VP of Infrastructure with the security proof point they
+              viewed.
+            </p>
+          </div>
+          <button>
+            Review suggested outreach <ArrowRight size={14} />
+          </button>
+        </div>
+        <footer>
+          <CheckCircle2 />
+          <span>
+            <b>Nothing disappears between tools</b>
+            <small>
+              The research, decision, message and outcome stay attached to one
+              account story.
+            </small>
+          </span>
+        </footer>
+      </div>
+    </section>
+  );
+}
 
-function DecisionJourney(){return <section className="decisionJourney" id="how-it-works"><div className="journeyIntro"><span className="blueKicker">From signal to next move</span><h2>Your team should never have to guess what matters today.</h2><p>Inem watches the handoffs between research, outreach and pipeline, then turns scattered activity into one decision your team can act on.</p><a href="#demo">See it with your sales process <ArrowRight size={15}/></a></div><div className="journeyCanvas"><header><span><i/>Live account story</span><b>Meridian Cloud</b><small>Updated 8 minutes ago</small></header><div className="journeySignal"><span className="journeyLabel">01 · Notice</span><div><b>Pricing intent is rising</b><p>Four people from Meridian revisited pricing and security pages this week.</p></div><span className="signalCount">4 visits</span></div><div className="journeyThread"><i/><i/><i/></div><div className="journeySignal decision"><span className="journeyLabel">02 · Decide</span><div><b>This account is worth attention</b><p>It matches your enterprise ICP, has an active cloud migration and no open opportunity.</p><div className="evidenceChips"><span>92 fit score</span><span>Verified signal</span><span>High confidence</span></div></div></div><div className="journeyThread"><i/><i/><i/></div><div className="journeySignal action"><span className="journeyLabel">03 · Act</span><div><b>Open a conversation today</b><p>Reach the VP of Infrastructure with the security proof point they viewed.</p></div><button>Review suggested outreach <ArrowRight size={14}/></button></div><footer><CheckCircle2/><span><b>Nothing disappears between tools</b><small>The research, decision, message and outcome stay attached to one account story.</small></span></footer></div></section>}
+function OnePageSolutions() {
+  return (
+    <section className="growthLeaks" id="solutions">
+      <div className="growthHead">
+        <span className="blueKicker">Where revenue loses momentum</span>
+        <h2>Fix the handoffs that quietly cost you customers.</h2>
+        <p>
+          Most teams do not need more sales activity. They need a clearer way to
+          decide where effort belongs and what happens next.
+        </p>
+      </div>
+      <div className="growthMosaic">
+        <article className="leakResearch">
+          <div className="leakCopy">
+            <span>Too much noise</span>
+            <h3>Your prospect list keeps growing. Confidence does not.</h3>
+            <p>
+              See why an account fits before anyone spends time researching or
+              writing.
+            </p>
+          </div>
+          <div className="miniAccounts">
+            <header>
+              <b>Accounts worth a closer look</b>
+              <small>Ranked by evidence</small>
+            </header>
+            {[
+              ["Nomba", "92", "Security hiring"],
+              ["SeamlessHR", "89", "New market"],
+              ["Helium Health", "76", "Recent funding"],
+            ].map((x, i) => (
+              <div key={x[0]}>
+                <span className="rank">0{i + 1}</span>
+                <b>{x[0]}</b>
+                <small>{x[2]}</small>
+                <strong>{x[1]}</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className="leakInterest">
+          <span>Hidden buying intent</span>
+          <h3>The warmest account is often buried in activity.</h3>
+          <div className="intentPulse">
+            <i />
+            <div>
+              <b>Meridian Cloud</b>
+              <small>4 high-intent visits · 8 min ago</small>
+            </div>
+            <strong>Hot</strong>
+          </div>
+          <p>
+            Bring meaningful signals into the same view as fit, contacts and
+            open deals.
+          </p>
+        </article>
+        <article className="leakMemory">
+          <span>Follow-up by memory</span>
+          <h3>Good conversations should not depend on someone remembering.</h3>
+          <ul>
+            <li>
+              <Check />
+              Share security overview <small>Today</small>
+            </li>
+            <li>
+              <Check />
+              Confirm buying committee <small>Tomorrow</small>
+            </li>
+            <li>
+              <Clock3 />
+              Proposal review <small>Friday</small>
+            </li>
+          </ul>
+        </article>
+        <article className="leakReceipt">
+          <div>
+            <span>Every decision has a receipt</span>
+            <h3>Know what created revenue, not only where the deal ended.</h3>
+          </div>
+          <div className="receiptFlow">
+            <span>ICP evidence</span>
+            <ArrowRight />
+            <span>Account signal</span>
+            <ArrowRight />
+            <span>Human action</span>
+            <ArrowRight />
+            <strong>₦8.4M won</strong>
+          </div>
+        </article>
+      </div>
+    </section>
+  );
+}
 
-function OnePageSolutions(){return <section className="growthLeaks" id="solutions"><div className="growthHead"><span className="blueKicker">Where revenue loses momentum</span><h2>Fix the handoffs that quietly cost you customers.</h2><p>Most teams do not need more sales activity. They need a clearer way to decide where effort belongs and what happens next.</p></div><div className="growthMosaic"><article className="leakResearch"><div className="leakCopy"><span>Too much noise</span><h3>Your prospect list keeps growing. Confidence does not.</h3><p>See why an account fits before anyone spends time researching or writing.</p></div><div className="miniAccounts"><header><b>Accounts worth a closer look</b><small>Ranked by evidence</small></header>{[['Nomba','92','Security hiring'],['SeamlessHR','89','New market'],['Helium Health','76','Recent funding']].map((x,i)=><div key={x[0]}><span className="rank">0{i+1}</span><b>{x[0]}</b><small>{x[2]}</small><strong>{x[1]}</strong></div>)}</div></article><article className="leakInterest"><span>Hidden buying intent</span><h3>The warmest account is often buried in activity.</h3><div className="intentPulse"><i/><div><b>Meridian Cloud</b><small>4 high-intent visits · 8 min ago</small></div><strong>Hot</strong></div><p>Bring meaningful signals into the same view as fit, contacts and open deals.</p></article><article className="leakMemory"><span>Follow-up by memory</span><h3>Good conversations should not depend on someone remembering.</h3><ul><li><Check/>Share security overview <small>Today</small></li><li><Check/>Confirm buying committee <small>Tomorrow</small></li><li><Clock3/>Proposal review <small>Friday</small></li></ul></article><article className="leakReceipt"><div><span>Every decision has a receipt</span><h3>Know what created revenue, not only where the deal ended.</h3></div><div className="receiptFlow"><span>ICP evidence</span><ArrowRight/><span>Account signal</span><ArrowRight/><span>Human action</span><ArrowRight/><strong>₦8.4M won</strong></div></article></div></section>}
+function ProofSection() {
+  const voices = [
+    {
+      quote:
+        "We stopped debating which accounts looked interesting. The reason to act is right there beside the account.",
+      name: "Ada Okafor",
+      role: "Revenue operations lead",
+      tone: "blue",
+    },
+    {
+      quote:
+        "The team starts the day with a short list of decisions, not another dashboard to interpret.",
+      name: "Tobi Adeyemi",
+      role: "Sales team lead",
+      tone: "dark",
+    },
+    {
+      quote:
+        "I can finally trace a won deal back to the segment, signal and follow-up that created it.",
+      name: "Nneka Eze",
+      role: "Founder and commercial lead",
+      tone: "sand",
+    },
+  ];
+  return (
+    <section className="proofSection">
+      <div className="proofStats">
+        {[
+          ["3.4x", "more qualified opportunities"],
+          ["28%", "faster follow-up time"],
+          ["94%", "of active deals with a next action"],
+          ["1 view", "from research to revenue"],
+        ].map((x) => (
+          <div key={x[0]}>
+            <strong>{x[0]}</strong>
+            <span>{x[1]}</span>
+          </div>
+        ))}
+      </div>
+      <div className="voiceWall">
+        <div className="voiceIntro">
+          <span className="blueKicker">Early access feedback</span>
+          <h2>Clarity feels different at every level of the team.</h2>
+          <p>
+            Three perspectives on what changes when evidence and action live in
+            the same place.
+          </p>
+        </div>
+        {voices.map((v, i) => (
+          <blockquote className={"voiceCard " + v.tone} key={v.name}>
+            <span className="quoteMark">“</span>
+            <p>{v.quote}</p>
+            <footer>
+              <span className="avatar">
+                {v.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
+              </span>
+              <span>
+                <b>{v.name}</b>
+                <small>{v.role}</small>
+              </span>
+            </footer>
+            {i === 0 && <em>Beta feedback</em>}
+          </blockquote>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-function ProofSection(){const voices=[{quote:'We stopped debating which accounts looked interesting. The reason to act is right there beside the account.',name:'Ada Okafor',role:'Revenue operations lead',tone:'blue'},{quote:'The team starts the day with a short list of decisions, not another dashboard to interpret.',name:'Tobi Adeyemi',role:'Sales team lead',tone:'dark'},{quote:'I can finally trace a won deal back to the segment, signal and follow-up that created it.',name:'Nneka Eze',role:'Founder and commercial lead',tone:'sand'}];return <section className="proofSection"><div className="proofStats">{[['3.4x','more qualified opportunities'],['28%','faster follow-up time'],['94%','of active deals with a next action'],['1 view','from research to revenue']].map(x=><div key={x[0]}><strong>{x[0]}</strong><span>{x[1]}</span></div>)}</div><div className="voiceWall"><div className="voiceIntro"><span className="blueKicker">Early access feedback</span><h2>Clarity feels different at every level of the team.</h2><p>Three perspectives on what changes when evidence and action live in the same place.</p></div>{voices.map((v,i)=><blockquote className={'voiceCard '+v.tone} key={v.name}><span className="quoteMark">“</span><p>{v.quote}</p><footer><span className="avatar">{v.name.split(' ').map(n=>n[0]).join('')}</span><span><b>{v.name}</b><small>{v.role}</small></span></footer>{i===0&&<em>Beta feedback</em>}</blockquote>)}</div></section>}
+function CapabilitySection() {
+  const rows = [
+    [
+      Search,
+      "Research with context",
+      "Search companies against a selected ICP, see why each account fits, and keep source and verification dates visible.",
+    ],
+    [
+      ContactRound,
+      "Reach the right people",
+      "Find relevant decision-makers, review contact quality and organize contacts before they enter a campaign.",
+    ],
+    [
+      Send,
+      "Launch with control",
+      "Create tailored outreach, require human approval, schedule follow-ups and keep every reply connected to its source campaign.",
+    ],
+    [
+      BriefcaseBusiness,
+      "Convert with discipline",
+      "Track deal value, stage history, tasks, proposals, next actions and verified outcomes without losing the original account context.",
+    ],
+  ];
+  return (
+    <section className="capabilitySection">
+      <div className="capabilityMedia">
+        <img
+          src={stockFounder}
+          alt="Two professionals working together at a laptop"
+        />
+        <div>
+          <span>Next best action</span>
+          <b>Follow up with 7 engaged accounts</b>
+          <small>Based on campaign activity and open tasks</small>
+        </div>
+      </div>
+      <div className="capabilityCopy">
+        <span className="blueKicker">More than a lead database</span>
+        <h2>Carry context through every stage of the sale.</h2>
+        <p className="capabilityIntro">
+          Inem Acquire keeps research, conversations, tasks and revenue evidence
+          attached to the same customer journey.
+        </p>
+        {rows.map(([I, t, d]) => (
+          <article key={t}>
+            <I />
+            <div>
+              <h3>{t}</h3>
+              <p>{d}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-function CapabilitySection(){const rows=[[Search,'Research with context','Search companies against a selected ICP, see why each account fits, and keep source and verification dates visible.'],[ContactRound,'Reach the right people','Find relevant decision-makers, review contact quality and organize contacts before they enter a campaign.'],[Send,'Launch with control','Create tailored outreach, require human approval, schedule follow-ups and keep every reply connected to its source campaign.'],[BriefcaseBusiness,'Convert with discipline','Track deal value, stage history, tasks, proposals, next actions and verified outcomes without losing the original account context.']];return <section className="capabilitySection"><div className="capabilityMedia"><img src={stockFounder} alt="Two professionals working together at a laptop"/><div><span>Next best action</span><b>Follow up with 7 engaged accounts</b><small>Based on campaign activity and open tasks</small></div></div><div className="capabilityCopy"><span className="blueKicker">More than a lead database</span><h2>Carry context through every stage of the sale.</h2><p className="capabilityIntro">Inem Acquire keeps research, conversations, tasks and revenue evidence attached to the same customer journey.</p>{rows.map(([I,t,d])=><article key={t}><I/><div><h3>{t}</h3><p>{d}</p></div></article>)}</div></section>}
+function OnePagePricing() {
+  const [yearly, setYearly] = useState(false);
+  const plans = [
+    {
+      name: "Starter",
+      monthly: 20,
+      yearly: 16,
+      desc: "For founders and small teams proving a repeatable acquisition motion.",
+      features: [
+        "1 workspace and 2 team members",
+        "1 active offer and ICP",
+        "500 prospect research credits",
+        "Core campaigns and pipeline",
+        "Standard reports",
+      ],
+    },
+    {
+      name: "Growth",
+      monthly: 59,
+      yearly: 47,
+      desc: "For sales teams ready to scale research, outreach and reporting.",
+      popular: true,
+      features: [
+        "5 team members",
+        "Unlimited offers and ICPs",
+        "2,500 prospect research credits",
+        "Advanced campaigns and inbox",
+        "AI diagnosis and advisor",
+        "Custom reports and integrations",
+      ],
+    },
+    {
+      name: "Scale",
+      custom: true,
+      desc: "For larger organizations that need greater capacity, governance and support.",
+      features: [
+        "Flexible seats and usage",
+        "Role-based access and SSO",
+        "Advanced security controls",
+        "Custom data integrations",
+        "Dedicated onboarding",
+        "Priority support and success plan",
+      ],
+    },
+  ];
+  return (
+    <section className="pricingSection" id="pricing">
+      <div className="sectionHead">
+        <span className="blueKicker">Plans for every stage</span>
+        <h2>Start focused. Scale with confidence.</h2>
+        <p>
+          Choose a plan that fits your team today. Change plans as your sales
+          system grows.
+        </p>
+        <div className="billingToggle" aria-label="Billing frequency">
+          <button
+            aria-pressed={!yearly}
+            className={!yearly ? "active" : ""}
+            onClick={() => setYearly(false)}
+          >
+            Monthly
+          </button>
+          <button
+            aria-pressed={yearly}
+            className={yearly ? "active" : ""}
+            onClick={() => setYearly(true)}
+          >
+            Yearly <span>Save 20%</span>
+          </button>
+        </div>
+      </div>
+      <div className="planGrid">
+        {plans.map((plan) => (
+          <article className={plan.popular ? "popular" : ""} key={plan.name}>
+            {plan.popular && <span className="popularLabel">Most popular</span>}
+            <h3>{plan.name}</h3>
+            <p>{plan.desc}</p>
+            <div className="planPrice">
+              {plan.custom ? (
+                <strong>Custom</strong>
+              ) : (
+                <>
+                  <strong>${yearly ? plan.yearly : plan.monthly}</strong>
+                  <span>/ month</span>
+                </>
+              )}
+              <small>
+                {plan.custom
+                  ? "Talk to us about your requirements"
+                  : yearly
+                    ? "Billed annually"
+                    : "Billed monthly"}
+              </small>
+            </div>
+            <Button
+              as={plan.custom ? "a" : Link}
+              href={plan.custom ? "#demo" : undefined}
+              to={plan.custom ? undefined : "/signup"}
+              kind={plan.popular ? "primary" : "secondary"}
+            >
+              {plan.custom ? "Request a quote" : "Start free"}{" "}
+              <ArrowRight size={15} />
+            </Button>
+            <ul>
+              {plan.features.map((f) => (
+                <li key={f}>
+                  <Check />
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+      <p className="pricingNote">
+        All plans include guided onboarding, data export and human approval
+        before outbound communication. Usage limits reset monthly.
+      </p>
+    </section>
+  );
+}
 
-function OnePagePricing(){const [yearly,setYearly]=useState(false);const plans=[{name:'Starter',monthly:20,yearly:16,desc:'For founders and small teams proving a repeatable acquisition motion.',features:['1 workspace and 2 team members','1 active offer and ICP','500 prospect research credits','Core campaigns and pipeline','Standard reports']},{name:'Growth',monthly:59,yearly:47,desc:'For sales teams ready to scale research, outreach and reporting.',popular:true,features:['5 team members','Unlimited offers and ICPs','2,500 prospect research credits','Advanced campaigns and inbox','AI diagnosis and advisor','Custom reports and integrations']},{name:'Scale',custom:true,desc:'For larger organizations that need greater capacity, governance and support.',features:['Flexible seats and usage','Role-based access and SSO','Advanced security controls','Custom data integrations','Dedicated onboarding','Priority support and success plan']}];return <section className="pricingSection" id="pricing"><div className="sectionHead"><span className="blueKicker">Plans for every stage</span><h2>Start focused. Scale with confidence.</h2><p>Choose a plan that fits your team today. Change plans as your sales system grows.</p><div className="billingToggle" aria-label="Billing frequency"><button aria-pressed={!yearly} className={!yearly?'active':''} onClick={()=>setYearly(false)}>Monthly</button><button aria-pressed={yearly} className={yearly?'active':''} onClick={()=>setYearly(true)}>Yearly <span>Save 20%</span></button></div></div><div className="planGrid">{plans.map(plan=><article className={plan.popular?'popular':''} key={plan.name}>{plan.popular&&<span className="popularLabel">Most popular</span>}<h3>{plan.name}</h3><p>{plan.desc}</p><div className="planPrice">{plan.custom?<strong>Custom</strong>:<><strong>${yearly?plan.yearly:plan.monthly}</strong><span>/ month</span></>}<small>{plan.custom?'Talk to us about your requirements':yearly?'Billed annually':'Billed monthly'}</small></div><Button as={plan.custom?'a':Link} href={plan.custom?'#demo':undefined} to={plan.custom?undefined:'/signup'} kind={plan.popular?'primary':'secondary'}>{plan.custom?'Request a quote':'Start free'} <ArrowRight size={15}/></Button><ul>{plan.features.map(f=><li key={f}><Check/>{f}</li>)}</ul></article>)}</div><p className="pricingNote">All plans include guided onboarding, data export and human approval before outbound communication. Usage limits reset monthly.</p></section>}
+function FaqSection() {
+  const faqs = [
+    [
+      "Can I use Inem Acquire without replacing my CRM?",
+      "Yes. Start with Inem Acquire as your acquisition workspace, then connect or export qualified companies, contacts and deals to your existing CRM.",
+    ],
+    [
+      "Does Inem Acquire send messages automatically?",
+      "Your team controls outbound communication. Drafts, recipients and campaign settings can require approval before anything is sent.",
+    ],
+    [
+      "Where does prospect data come from?",
+      "Records can combine licensed provider data, public company information and details supplied by your team. Sources and verification dates remain visible.",
+    ],
+    [
+      "What happens when information is missing?",
+      "The platform marks unknown inputs and lowers confidence instead of presenting assumptions as verified facts.",
+    ],
+    [
+      "Can each product have a different ICP?",
+      "Yes. Every offer can have its own ICPs, prospect searches, messages, campaigns and performance reporting.",
+    ],
+    [
+      "Is there a free trial?",
+      "Starter and Growth plans include a 14-day trial. No payment card is required to create the initial workspace.",
+    ],
+  ];
+  return (
+    <section className="faqSection">
+      <div>
+        <span className="blueKicker">Common questions</span>
+        <h2>Everything you need to evaluate Inem Acquire.</h2>
+        <p>
+          Still have a question? Request a demo and we will walk through your
+          specific sales process.
+        </p>
+        <a href="#demo">
+          Talk to our team <ArrowRight size={15} />
+        </a>
+      </div>
+      <div className="faqList">
+        {faqs.map((f, i) => (
+          <details key={f[0]} open={i === 0}>
+            <summary>
+              {f[0]}
+              <Plus />
+            </summary>
+            <p>{f[1]}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-function FaqSection(){const faqs=[['Can I use Inem Acquire without replacing my CRM?','Yes. Start with Inem Acquire as your acquisition workspace, then connect or export qualified companies, contacts and deals to your existing CRM.'],['Does Inem Acquire send messages automatically?','Your team controls outbound communication. Drafts, recipients and campaign settings can require approval before anything is sent.'],['Where does prospect data come from?','Records can combine licensed provider data, public company information and details supplied by your team. Sources and verification dates remain visible.'],['What happens when information is missing?','The platform marks unknown inputs and lowers confidence instead of presenting assumptions as verified facts.'],['Can each product have a different ICP?','Yes. Every offer can have its own ICPs, prospect searches, messages, campaigns and performance reporting.'],['Is there a free trial?','Starter and Growth plans include a 14-day trial. No payment card is required to create the initial workspace.']];return <section className="faqSection"><div><span className="blueKicker">Common questions</span><h2>Everything you need to evaluate Inem Acquire.</h2><p>Still have a question? Request a demo and we will walk through your specific sales process.</p><a href="#demo">Talk to our team <ArrowRight size={15}/></a></div><div className="faqList">{faqs.map((f,i)=><details key={f[0]} open={i===0}><summary>{f[0]}<Plus/></summary><p>{f[1]}</p></details>)}</div></section>}
-
-function DemoSection(){const [submitted,setSubmitted]=useState(false);return <section className="demoSection" id="demo"><div className="demoCopy"><span className="blueKicker">See it with your own sales process</span><h2>Request a personalized demo.</h2><p>Tell us what your team sells and where acquisition feels difficult. We will show you how diagnosis, prospecting, campaigns and pipeline management work together.</p><ul><li><Check/>30-minute product walkthrough</li><li><Check/>Your offers and target markets mapped to the workflow</li><li><Check/>Clear implementation and pricing answers</li></ul></div>{submitted?<div className="demoSuccess" role="status"><CheckCircle2/><h3>Your demo request is ready.</h3><p>Thanks. Our team will contact you within one business day to arrange a suitable time.</p><button onClick={()=>setSubmitted(false)}>Submit another request</button></div>:<form className="demoForm" onSubmit={e=>{e.preventDefault();setSubmitted(true)}}><div className="formRow"><Field label="First name" placeholder="Ada"/><Field label="Last name" placeholder="Okafor"/></div><Field label="Work email" type="email" placeholder="ada@company.com"/><Field label="Company" placeholder="Acme Technologies"/><div className="formRow"><Field label="Team size" placeholder="11 to 50"/><Field label="Primary market" placeholder="B2B software"/></div><Field label="What would you like to improve?" area placeholder="Tell us about your acquisition goals or current challenge"/><Button>Request my demo <ArrowRight size={16}/></Button><small>By submitting, you agree that Inem Acquire may contact you about this request.</small></form>}</section>}
-function MarketingPage({type}){const data={
- 'how-it-works':['A connected path from diagnosis to revenue','Replace disconnected tools and unclear handoffs with one measurable acquisition process.'],features:['Every tool your team needs to acquire customers','Research, engagement, pipeline and reporting-built around your offers and ideal customers.'],pricing:['Start focused. Scale when the process works.','Clear plans with explicit research, enrichment and outreach limits.'],solutions:['Designed for considered B2B sales','Practical workflows for SaaS companies, agencies and professional service teams.'],'b2b-saas':['Build a repeatable SaaS pipeline','Connect product positioning, target accounts, multi-threaded outreach and revenue evidence.'],agencies:['Win more of the right client work','Find accounts that value your specialty and keep every opportunity moving.'],'service-businesses':['Turn expertise into consistent opportunities','Package your offer, target best-fit buyers and build a reliable follow-up rhythm.'],about:['Built to make acquisition less uncertain','Inem Acquire helps teams make better sales decisions with evidence, clarity and control.'],blog:['Ideas for more predictable growth','Practical guides for finding, engaging and converting the right customers.'],security:['Your sales data stays yours','Tenant isolation, least-privilege access and audit-ready controls by design.'],privacy:['Privacy at Inem Acquire','How we collect, use and protect account and workspace information.'],terms:['Terms of service','The terms that govern use of the Inem Acquire platform.'],'acceptable-use':['Responsible platform use','Rules designed to keep prospecting respectful, lawful and useful.'],'data-processing':['Data processing information','How Inem Acquire handles customer data and service providers.']}[type];return <><PublicNav/><main className="marketing"><section className="pageHero"><Pill tone="green">INEM ACQUIRE</Pill><h1>{data[0]}</h1><p>{data[1]}</p><Button as={Link} to={type==='pricing'?'/signup':'/book-demo'}>{type==='pricing'?'Start free':'See Inem Acquire'} <ArrowRight size={16}/></Button></section>{type==='pricing'?<Pricing/>:type==='blog'?<Blog/>:<FeatureBlocks type={type}/>}</main><PublicFooter/></>}
-function FeatureBlocks({type}){const items=[['Evidence before opinions','Every finding links back to known facts, supplied information or a clearly marked assumption.'],['A workflow your team can follow','From discovery to follow-up, each record has a clear owner and next action.'],['Human control by default','Your team reviews contacts, messaging and major changes before they happen.']];return <section className="featureBlocks">{items.map((x,i)=><article key={x[0]}><span>0{i+1}</span><div><h2>{x[0]}</h2><p>{x[1]}</p><Link to="/features">Explore the capability <ArrowRight size={15}/></Link></div><div className={'abstract a'+i}><Lightbulb/></div></article>)}</section>}
-function Pricing(){return <section className="pricingGrid">{[['Foundation','₦95,000','For small teams building their first repeatable system.'],['Growth','₦275,000','For teams ready to scale research, campaigns and reporting.'],['Scale','Custom','For multi-team organizations with advanced controls.']].map((p,i)=><article className={i===1?'featured':''} key={p[0]}>{i===1&&<Pill tone="green">MOST POPULAR</Pill>}<h2>{p[0]}</h2><p>{p[2]}</p><b>{p[1]}</b>{p[1]!=='Custom'&&<small>/ month</small>}<Button as={Link} to="/signup" kind={i===1?'primary':'secondary'}>Choose {p[0]}</Button>{['Connected sales workspace','ICP and prospect discovery','Campaign approval workflow','Pipeline and revenue reporting'].map(x=><span className="checkLine" key={x}><Check/> {x}</span>)}</article>)}</section>}
-function Blog(){return <section className="blogGrid">{['Why more leads rarely fix a broken sales process','How to create an ICP your team can actually use','The revenue evidence every B2B team should track'].map((x,i)=><article key={x}><div className={'blogArt b'+i}/><Pill>{i===0?'STRATEGY':i===1?'TARGETING':'MEASUREMENT'}</Pill><h2>{x}</h2><p>Practical guidance for building a more focused, measurable acquisition system.</p><Link to="#">Read guide <ArrowRight size={15}/></Link></article>)}</section>}
-function ContactPage({demo=false}){return <><PublicNav/><main className="splitPage"><section><Pill tone="green">{demo?'PRODUCT DEMO':'CONTACT'}</Pill><h1>{demo?'See your acquisition workflow in one place.':'Let’s talk about what your team needs.'}</h1><p>{demo?'In 30 minutes, we’ll map Inem Acquire to your current process and answer your implementation questions.':'Tell us what you are trying to improve and our team will respond within one business day.'}</p><div className="quote"><p>“The clarity we needed was not another contact list. It was knowing who to pursue, why, and what to do next.”</p><b>- Pilot customer, B2B services</b></div></section><form className="formCard" onSubmit={e=>e.preventDefault()}><h2>{demo?'Book your demo':'Send a message'}</h2><Field label="Work email" placeholder="you@company.com" type="email"/><div className="formRow"><Field label="First name" placeholder="Ada"/><Field label="Last name" placeholder="Okafor"/></div><Field label="Company" placeholder="Your company"/><Field label={demo?'Team size':'How can we help?'} placeholder={demo?'1-10 people':'Tell us a little about your goal'} area={!demo}/><Button>{demo?'Choose a time':'Send message'} <ArrowRight size={16}/></Button><small>By continuing, you agree to our privacy policy.</small></form></main><PublicFooter/></>}
-function Field({label,placeholder,type='text',area=false,value,onChange,defaultValue}){return <label className="field"><span>{label}</span>{area?<textarea placeholder={placeholder} value={value} onChange={onChange}/>:<input type={type} placeholder={placeholder} value={value} onChange={onChange} defaultValue={defaultValue}/>}</label>}
-function Auth({mode}){const navigate=useNavigate();const copy={login:['Welcome back','Sign in to continue to your workspace.','Sign in'],signup:['Create your workspace','Start building a more predictable sales process.','Create account'],'forgot-password':['Reset your password','We’ll send a secure reset link to your email.','Send reset link'],'reset-password':['Choose a new password','Use at least 10 characters.','Update password'],'verify-email':['Check your inbox','We sent a verification link to ada@acme.com.','Open email app'],invite:['Join Acme Technologies','Ada invited you to collaborate in Inem Acquire.','Accept invitation']}[mode];return <main className="authPage"><section className="authStory"><Brand/><div><Pill tone="dark">EVIDENCE-LED SALES</Pill><h1>Build a pipeline your team can explain.</h1><p>Inem Acquire turns scattered customer information into focused actions your sales team can follow.</p><div className="authProof"><span><Check/> Research connected to your ICP</span><span><Check/> Outreach reviewed by your team</span><span><Check/> Revenue verified from real outcomes</span></div></div><small>© 2026 Inem Acquire</small></section><section className="authForm"><div className="mobileBrand"><Brand/></div><form onSubmit={e=>{e.preventDefault();navigate(mode==='signup'?'/onboarding/welcome':'/app/dashboard')}}><h1>{copy[0]}</h1><p>{copy[1]}</p>{['verify-email','invite'].includes(mode)?<div className="authIcon"><Mail/></div>:<><Field label="Work email" type="email" placeholder="you@company.com" defaultValue={mode==='signup'?new URLSearchParams(window.location.search).get('email')||'':undefined}/>{!['forgot-password'].includes(mode)&&<Field label={mode==='reset-password'?'New password':'Password'} type="password" placeholder="••••••••••"/>}</>}<Button>{copy[2]} <ArrowRight size={16}/></Button>{mode==='login'&&<><div className="formMeta"><label><input type="checkbox"/> Remember me</label><Link to="/forgot-password">Forgot password?</Link></div><p className="switch">New to Inem Acquire? <Link to="/signup">Create an account</Link></p></>}{mode==='signup'&&<p className="switch">Already have an account? <Link to="/login">Sign in</Link></p>}</form></section></main>}
-const onboardSteps=['welcome','company','offer','customers','sales','goals','data','review','complete'];
-function Onboarding({step}){const i=onboardSteps.indexOf(step),navigate=useNavigate();const content={welcome:['Let’s build your acquisition workspace','We’ll use your company, offer and customer evidence to create a useful first diagnosis and ICP.'],company:['Tell us about your company','This creates the shared context behind research and recommendations.'],offer:['What do you sell?','Describe one offer first. You can add more products or services later.'],customers:['Who gets the most value?','Use evidence from existing customers where you can. Unknown details are okay.'],sales:['How does sales work today?','A baseline helps us separate real constraints from assumptions.'],goals:['What would good growth look like?','Set practical targets based on your team’s capacity.'],data:['Bring existing sales context','Import a CRM file or continue without one. You can do this later.'],review:['Review your workspace','Confirm the essentials before we generate your first ICP and diagnosis.'],complete:['Your workspace is ready','We created a draft ICP and queued your first diagnosis.']}[step];const next=()=>navigate(i===onboardSteps.length-1?'/app/dashboard':'/onboarding/'+onboardSteps[i+1]);return <main className="onboarding"><aside><Brand/><div className="stepper">{onboardSteps.slice(0,-1).map((s,n)=><div className={n===i?'active':n<i?'done':''} key={s}><span>{n<i?<Check size={14}/>:n+1}</span><b>{s[0].toUpperCase()+s.slice(1)}</b></div>)}</div><small>Your progress saves automatically.</small></aside><section className="onboardMain"><header><span>Step {Math.min(i+1,8)} of 8</span><button onClick={()=>navigate('/login')}>Save & exit</button></header><div className="onboardBody"><Pill tone="green">SET UP YOUR WORKSPACE</Pill><h1>{content[0]}</h1><p>{content[1]}</p><OnboardFields step={step}/><div className="onboardActions">{i>0&&i<8?<Button kind="ghost" onClick={()=>navigate('/onboarding/'+onboardSteps[i-1])}>Back</Button>:<span/>}<Button onClick={next}>{i===8?'Go to dashboard':i===7?'Create workspace':'Continue'} <ArrowRight size={16}/></Button></div></div></section></main>}
-function OnboardFields({step}){if(step==='welcome')return <div className="welcomeList">{[['About 8 minutes','Answer only what you know.'],['Built around evidence','We mark missing information clearly.'],['Always in your control','Nothing is sent without approval.']].map(([a,b],i)=><div key={a}><span>0{i+1}</span><p><b>{a}</b>{b}</p></div>)}</div>;if(step==='data')return <div className="dropzone"><Database/><b>Drop your CSV or spreadsheet here</b><p>Contacts, companies and deal history up to 25 MB</p><Button kind="secondary">Choose file</Button></div>;if(step==='review')return <div className="reviewGrid">{[['Company','Acme Technologies'],['Offer','Managed cloud operations'],['Best customers','Financial services · 50-500 employees'],['Goal','12 qualified opportunities / month']].map(x=><div key={x[0]}><span>{x[0]}</span><b>{x[1]}</b><button>Edit</button></div>)}</div>;if(step==='complete')return <div className="completeCard"><div className="pulse"><Check/></div><div><b>Acme workspace created</b><p>Initial diagnosis is 64% complete. We’ll notify you when it’s ready.</p><div className="progress"><i style={{width:'64%'}}/></div></div></div>;const fields={company:[['Company name','Acme Technologies'],['Website','https://acme.com'],['Industry','Technology services'],['Company size','11-50 employees']],offer:[['Offer name','Managed cloud operations'],['Pricing model','Monthly retainer'],['Problem solved','Reliable cloud infrastructure without a large internal team'],['Typical sales cycle','30-60 days']],customers:[['Industries served','Financial services, professional services'],['Company size','50-500 employees'],['Decision-makers','CTO, Head of Infrastructure, COO'],['Markets','Nigeria, Ghana, United Kingdom']],sales:[['Current customers','18'],['Average contract value','₦4,500,000'],['Qualified leads / month','6'],['Main challenge','Strong replies but too few meetings']],goals:[['Qualified opportunities / month','12'],['Target contract value','₦6,000,000'],['Sales capacity','2 team members'],['Preferred channels','Email and LinkedIn']]};return <div className="onboardGrid">{fields[step]?.map(x=><Field key={x[0]} label={x[0]} placeholder={x[1]}/>)}</div>}
-function AppShell({children}){const [mobile,setMobile]=useState(false);return <div className="appShell"><aside className={mobile?'appSide open':'appSide'}><div className="sideTop"><Brand/><button aria-label="Close menu" onClick={()=>setMobile(false)}><PanelLeftClose/></button></div><button className="workspace"><span className="avatar square">A</span><span><b>Acme Technologies</b><small>Growth plan</small></span><ChevronDown/></button><nav>{sideGroups.map(([g,items])=><div className="navGroup" key={g}><small>{g}</small>{items.map(([t,to,I])=><NavLink to={to} key={to} onClick={()=>setMobile(false)}><I/>{t}</NavLink>)}</div>)}</nav><div className="sideBottom"><NavLink to="/app/settings"><Settings/> Settings</NavLink><div className="userChip"><span className="avatar">AO</span><span><b>Ada Okafor</b><small>Workspace owner</small></span><MoreHorizontal/></div></div></aside><div className="appBody"><header className="appTop"><button className="menuBtn" aria-label="Open menu" onClick={()=>setMobile(true)}><Menu/></button><div className="globalSearch"><Search/><input aria-label="Search workspace" placeholder="Search anything..."/><kbd>⌘ K</kbd></div><div className="topActions"><button aria-label="Notifications"><Bell/></button><Button icon={Plus}>Create</Button></div></header>{children}</div>{mobile&&<button className="scrim" aria-label="Close menu" onClick={()=>setMobile(false)}/>}</div>}
-function PageHeader({title,desc,action='Create new',icon=Plus,children}){return <div className="pageHeader"><div><h1>{title}</h1><p>{desc}</p></div><div className="headerActions">{children}<Button icon={icon}>{action}</Button></div></div>}
-function Stat({label,value,delta,icon:I,tone='green'}){return <article className="stat"><span className={'statIcon '+tone}><I/></span><div><small>{label}</small><b>{value}</b><em>{delta}</em></div></article>}
-function Dashboard(){const [completed,setCompleted]=useState([]);return <AppShell><main className="appMain"><PageHeader title="Good morning, Ada" desc="Here’s what needs attention across your acquisition system." action="Ask AI advisor" icon={Lightbulb}><button className="dateBtn"><CalendarDays/> Oct 8 - Nov 6 <ChevronDown/></button></PageHeader><section className="stats"><Stat label="Qualified pipeline" value="₦42.8M" delta="↑ 18.2%" icon={WalletCards}/><Stat label="Meetings booked" value="24" delta="↑ 6 this month" icon={CalendarDays} tone="blue"/><Stat label="Reply rate" value="12.4%" delta="↑ 2.1%" icon={MessageSquareText} tone="amber"/><Stat label="Closed-won revenue" value="₦18.6M" delta="↑ 24.8%" icon={TrendingUp} tone="purple"/></section><section className="dashGrid"><article className="panel chartPanel"><PanelTitle title="Pipeline created" sub="Verified opportunities by week" action="Last 30 days"/><div className="bigValue">₦31.4M <Pill tone="green">+18.2%</Pill></div><svg className="lineChart" viewBox="0 0 700 220" preserveAspectRatio="none"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop stopColor={green} stopOpacity=".18"/><stop offset="1" stopColor={green} stopOpacity="0"/></linearGradient></defs><path d="M0 190 C80 170,80 180,150 135 S270 165,335 95 S450 125,520 62 S640 85,700 20 L700 220 L0 220Z" fill="url(#area)"/><path d="M0 190 C80 170,80 180,150 135 S270 165,335 95 S450 125,520 62 S640 85,700 20" fill="none" stroke={green} strokeWidth="3"/><g className="gridLines"><path d="M0 50H700M0 100H700M0 150H700M0 200H700"/></g></svg><div className="chartLabels"><span>Oct 8</span><span>Oct 15</span><span>Oct 22</span><span>Oct 29</span><span>Nov 6</span></div></article><article className="panel nextAction"><div className="sparkIcon"><Lightbulb/></div><Pill tone="green">AI RECOMMENDATION</Pill><h2>Re-engage your strongest accounts.</h2><p>Seven high-fit prospects opened your last campaign but have no follow-up scheduled.</p><Button>Review 7 prospects <ArrowRight size={15}/></Button><small>Based on campaign and task activity</small></article><article className="panel span2"><PanelTitle title="Pipeline by stage" sub="₦54.2M across 23 active deals" action="View pipeline"/><div className="stageBars">{[['Qualified','8 deals','₦18.4M',72],['Meeting','5 deals','₦12.8M',58],['Proposal','4 deals','₦16.2M',64],['Negotiation','2 deals','₦6.8M',35]].map(x=><div key={x[0]}><span><b>{x[0]}</b><small>{x[1]}</small></span><i><em style={{width:x[3]+'%'}}/></i><b>{x[2]}</b></div>)}</div></article><article className="panel"><PanelTitle title="Upcoming" sub="Tasks that need attention" action="View all"/><div className="taskList">{tasks.slice(0,3).map((x,i)=><div key={x[0]} className={completed.includes(x[0])?'taskComplete':' '}><button className="checkBtn" aria-label={'Complete '+x[0]} aria-pressed={completed.includes(x[0])} onClick={()=>setCompleted(items=>items.includes(x[0])?items.filter(item=>item!==x[0]):[...items,x[0]])}>{completed.includes(x[0])&&<Check/>}</button><span><b>{x[0]}</b><small><Clock3/> {x[1]} · {x[3]}</small></span><Pill tone={i===0?'red':'neutral'}>{x[2]}</Pill></div>)}</div></article></section></main></AppShell>}
-function PanelTitle({title,sub,action}){return <div className="panelTitle"><div><h2>{title}</h2><p>{sub}</p></div><button>{action} <ChevronRight/></button></div>}
-function GenericPage({name}){const [title,desc]=pageMeta[name];let content=<DataTable name={name}/>;if(name==='diagnosis')content=<Diagnosis/>;if(name==='ideal-customers')content=<ICP/>;if(name==='prospects')content=<Prospects/>;if(name==='pipeline')content=<Pipeline/>;if(name==='inbox')content=<InboxPage/>;if(name==='analytics')content=<Analytics/>;if(name==='settings'||name==='billing'||name==='team'||name==='integrations')content=<SettingsPage tab={name}/>;if(name==='admin')content=<Admin/>;if(name==='ai-advisor')content=<Advisor/>;return <AppShell><main className="appMain"><PageHeader title={title} desc={desc} action={name==='reports'?'Create report':name==='tasks'?'Add task':name==='campaigns'?'New campaign':name==='contacts'?'Add contact':name==='offers'?'New offer':name==='lists'?'New list':'Create new'}>{['prospects','contacts','lists','campaigns','deals','tasks','reports'].includes(name)&&<Button kind="secondary" icon={Filter}>Filter</Button>}</PageHeader>{content}</main></AppShell>}
-function EmptyState({icon:I=Search,title='Nothing here yet',desc='Create your first record to get started.'}){return <div className="empty"><span><I/></span><h3>{title}</h3><p>{desc}</p><Button icon={Plus}>Create new</Button></div>}
-function DataTable({name}){if(name==='reports')return <div className="reportGrid">{[['Acquisition overview','Funnel performance, channel contribution and revenue.'],['Campaign performance','Delivery, engagement, replies and conversions.'],['Pipeline health','Stage velocity, aging and forecast risks.'],['ICP performance','Performance by segment and fit criteria.']].map((x,i)=><article className="panel" key={x[0]}><span className="reportIcon"><FileText/></span><Pill>{i<2?'SCHEDULED':'TEMPLATE'}</Pill><h2>{x[0]}</h2><p>{x[1]}</p><div><button>Preview</button><button><MoreHorizontal/></button></div></article>)}</div>;if(name==='offers')return <div className="offerGrid">{[['Managed cloud operations','Active','₦4.5M avg. value','Financial services · 50-500 employees'],['Security assessment','Active','₦1.2M avg. value','Regulated businesses · 20-200 employees'],['Infrastructure migration','Draft','₦8M avg. value','Technology firms · 100-1,000 employees']].map((x,i)=><article className="panel offer" key={x[0]}><div><span className={'offerIcon o'+i}><Zap/></span><Pill tone={x[1]==='Active'?'green':'neutral'}>{x[1]}</Pill></div><h2>{x[0]}</h2><p>{x[3]}</p><strong>{x[2]}</strong><div><span>{3-i} ICPs</span><span>{12+i*7} prospects</span><span>{i+1} campaigns</span></div><button>Open offer <ArrowRight/></button></article>)}</div>;if(name==='contacts')return <Table title="All contacts" columns={['Contact','Role','Company','Email status']} rows={contacts}/>;if(name==='tasks')return <Table title="All tasks" columns={['Task','Due','Priority','Assignee']} rows={tasks}/>;if(name==='campaigns')return <Table title="All campaigns" columns={['Campaign','Status','Audience','Reply rate']} rows={[['HR leaders · Nigeria','Active','184 contacts','14.2%'],['Cloud reliability Q4','Scheduled','96 contacts','-'],['Fintech operations leaders','Draft','128 contacts','-'],['Re-engage warm accounts','Paused','42 contacts','9.8%']]}/>;if(name==='lists')return <Table title="Prospect lists" columns={['List','Type','Records','Updated']} rows={[['High-fit fintech accounts','Companies','42','Today'],['HR leaders · Nigeria','Contacts','184','Yesterday'],['Opened, no reply','Dynamic','28','2 hours ago'],['Q4 strategic accounts','Companies','36','Nov 2']]}/>;if(name==='deals')return <Table title="All deals" columns={['Deal','Stage','Value','Owner']} rows={[['Nomba · Cloud operations','Proposal','₦8.4M','Ada'],['SeamlessHR · Security review','Meeting','₦3.2M','Tomi'],['Moniepoint · Migration','Negotiation','₦14.6M','Ada'],['Helium Health · Assessment','Qualified','₦1.8M','Chidi']]}/>;if(name==='company')return <Profile/>;return <EmptyState/>}
-function Table({title,columns,rows}){const [q,setQ]=useState('');const shown=rows.filter(r=>r.join(' ').toLowerCase().includes(q.toLowerCase()));return <section className="panel tablePanel"><div className="tableTools"><h2>{title}<Pill>{shown.length}</Pill></h2><label><Search/><input placeholder="Search..." value={q} onChange={e=>setQ(e.target.value)}/></label></div><div className="tableWrap"><table><thead><tr><th><input type="checkbox" aria-label="Select all"/></th>{columns.map(c=><th key={c}>{c}</th>)}<th/></tr></thead><tbody>{shown.map((r,i)=><tr key={r[0]}><td><input type="checkbox" aria-label={'Select '+r[0]}/></td>{r.map((c,j)=><td key={j}>{j===0?<span className="entity"><span className="avatar small">{c.slice(0,2).toUpperCase()}</span><b>{c}</b></span>:j===r.length-1?<Pill tone={/Verified|Active|High|Proposal|Today/.test(c)?'green':'neutral'}>{c}</Pill>:c}</td>)}<td><button aria-label="More options"><MoreHorizontal/></button></td></tr>)}</tbody></table></div>{shown.length===0&&<EmptyState title="No matching records" desc="Try a broader search or clear your filters."/>}<div className="pagination"><span>Showing {shown.length} of {rows.length}</span><div><button disabled>Previous</button><button>Next</button></div></div></section>}
-function Diagnosis(){const [expanded,setExpanded]=useState(false);return <><section className="diagnosisHero"><div><Pill tone="green"><Activity size={13}/> Latest diagnosis</Pill><h2>Your offer is clear, but follow-up is costing you qualified opportunities.</h2><p>Based on 18 evidence points across your website, sales data and team inputs.</p><div><Button aria-expanded={expanded} aria-controls="diagnosis-detail" onClick={()=>setExpanded(value=>!value)}>{expanded?'Close full diagnosis':'Open full diagnosis'}</Button><Button kind="secondary" icon={RefreshCcw}>Run again</Button></div></div><div className="scoreRing"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/><circle className="score" cx="50" cy="50" r="40"/></svg><span><b>72</b><small>Sales health</small></span></div></section>{expanded&&<section className="panel diagnosisDetail" id="diagnosis-detail"><AnimatedPreview previewKey="diagnosis"><h2>What this diagnosis is based on</h2><p>This sample review connects 18 evidence points across your company context, sales activity and recorded outcomes.</p><ul><li>Seven strong-fit accounts have no next action scheduled.</li><li>Fintech opportunities close 1.8× faster than other segments.</li><li>Proposal loss reasons are missing, which limits confidence.</li></ul></AnimatedPreview></section>}<section className="findingGrid">{[['Critical constraint','Follow-up gaps after positive engagement','7 strong-fit accounts have no next action scheduled.','red'],['Growth opportunity','Your strongest segment is underrepresented','Fintech accounts close 1.8× faster than other segments.','green'],['Missing evidence','Proposal loss reasons are not recorded','Confidence is limited until more outcomes are categorized.','amber']].map(x=><article className="panel finding" key={x[0]}><Pill tone={x[3]}>{x[0]}</Pill><h2>{x[1]}</h2><p>{x[2]}</p><span><ShieldCheck/> Evidence reviewed · Medium confidence</span><button>Review finding <ArrowRight/></button></article>)}</section><Table title="Diagnosis history" columns={['Diagnosis','Status','Score','Completed']} rows={[['November acquisition review','Complete','72 / 100','Today'],['September reassessment','Complete','64 / 100','Sep 18'],['Initial workspace diagnosis','Complete','58 / 100','Aug 2']]}/></>}
-function ICP(){return <div className="icpLayout"><aside className="panel icpList"><div><h2>Profiles</h2><button><Plus/></button></div>{[['Fintech operations leaders','Primary · v4','Active'],['Professional services','Secondary · v2','Active'],['Healthtech scale-ups','Draft · v1','Draft']].map((x,i)=><button className={i===0?'active':''} key={x[0]}><span><b>{x[0]}</b><small>{x[1]}</small></span><Pill tone={x[2]==='Active'?'green':'neutral'}>{x[2]}</Pill></button>)}</aside><section className="panel icpDetail"><div className="icpTop"><div><Pill tone="green">PRIMARY ICP</Pill><h2>Fintech operations leaders</h2><p>Best-fit accounts for managed cloud operations.</p></div><Button kind="secondary">Edit profile</Button></div><div className="fitScore"><div><span>ICP confidence</span><b>High</b></div><div className="progress"><i style={{width:'88%'}}/></div><p>Based on 11 closed opportunities and 18 current customers.</p></div><div className="criteriaGrid">{[['Company','Financial services · 50-500 employees · Nigeria & Ghana'],['Decision-makers','CTO · Head of Infrastructure · COO'],['Pain points','Reliability incidents · Compliance pressure · Lean internal team'],['Buying signals','Hiring cloud engineers · Recent funding · Infrastructure expansion'],['Positive evidence','Faster sales cycles · Higher deal values · Better retention'],['Exclude','Consumer lenders under 20 employees · Pre-revenue startups']].map(x=><div key={x[0]}><small>{x[0]}</small><p>{x[1]}</p></div>)}</div><div className="sourceNote"><ShieldCheck/><p><b>Evidence, not certainty</b>This profile combines verified outcomes with team-supplied assumptions. Review it after every 10 deal outcomes.</p></div></section></div>}
-function Prospects(){return <><section className="filterBar"><label><Search/><input placeholder="Search companies, industry or market"/></label>{['ICP: Fintech operations','Nigeria','50-500 employees','Fit score 75+'].map(x=><button key={x}>{x}<ChevronDown/></button>)}<button className="filterMore"><Filter/> More filters</button></section><section className="panel prospectPanel"><div className="prospectTop"><div><h2>184 matching companies</h2><p>Scored against <b>Fintech operations leaders · v4</b></p></div><div><Button kind="secondary">Save search</Button><Button>Add to list</Button></div></div><div className="prospectCards">{companies.map((x,i)=><article key={x[0]}><input type="checkbox" aria-label={'Select '+x[0]}/><div className={'companyLogo l'+i}>{x[0][0]}</div><div className="companyInfo"><h3>{x[0]} <Pill tone="green">{x[4]} fit</Pill></h3><p>{x[1]} · {x[2]} · {i%2?'201-500':'51-200'} employees</p><div><span><Zap/> Hiring in infrastructure</span><span><Globe2/> Website verified</span></div></div><div className="fit"><small>FIT SCORE</small><b>{x[3]}</b><span>of 100</span></div><button><ChevronRight/></button></article>)}</div><div className="pagination"><span>Showing 1-5 of 184 companies</span><div><button disabled>Previous</button><button>Next</button></div></div></section></>}
-function Pipeline(){const stages=[['Qualified',8,'₦18.4M'],['Meeting',5,'₦12.8M'],['Proposal',4,'₦16.2M'],['Negotiation',2,'₦6.8M']];return <><div className="pipelineToolbar"><div><Button kind="secondary" icon={Filter}>Filter</Button><Button kind="secondary" icon={Users}>My deals</Button></div><div className="viewToggle"><button className="active">Board</button><button>List</button></div></div><section className="kanban">{stages.map((s,i)=><div className="kanbanCol" key={s[0]}><header><span><i className={'dot d'+i}/><b>{s[0]}</b><Pill>{s[1]}</Pill></span><strong>{s[2]}</strong></header>{[['Nomba','Cloud operations','₦8.4M','Nov 18'],['SeamlessHR','Security assessment','₦3.2M','Nov 22'],['Moniepoint','Infrastructure migration','₦14.6M','Dec 4']].slice(i?1:0,i===3?2:3).map((x,n)=><article key={x[0]}><div><span className="avatar square">{x[0][0]}</span><button><MoreHorizontal/></button></div><h3>{x[0]}</h3><p>{x[1]}</p><b>{x[2]}</b><footer><span><CalendarDays/> {x[3]}</span><span className="avatar small">{n?'TO':'AO'}</span></footer></article>)}</div>)}</section></>}
-function InboxPage(){const [active,setActive]=useState(0);const messages=[['Dami O.','Re: Cloud reliability at Nomba','This looks relevant. Can you send over a short overview and available times?','12m'],['Fiyin K.','Re: Scaling HR operations','Thanks for reaching out. I’ve shared this with our infrastructure lead.','1h'],['Uche A.','Re: Infrastructure migration','Could we revisit this next quarter? We are completing an internal project.','3h']];return <section className="inboxLayout"><aside className="panel inboxList"><div className="inboxSearch"><Search/><input placeholder="Search conversations"/></div>{messages.map((m,i)=><button className={active===i?'active':''} onClick={()=>setActive(i)} key={m[0]}><span className="avatar">{m[0].slice(0,2)}</span><span><b>{m[0]}<small>{m[3]}</small></b><strong>{m[1]}</strong><p>{m[2]}</p></span></button>)}</aside><article className="panel conversation"><header><div><span className="avatar">{messages[active][0].slice(0,2)}</span><span><h2>{messages[active][0]}</h2><p>VP, Operations · Nomba</p></span></div><Button kind="secondary">Create deal</Button></header><div className="thread"><div className="sent"><small>You · Yesterday, 10:14</small><p>Hi {messages[active][0].split(' ')[0]}, I noticed Nomba is growing its infrastructure team. We help fintech operations teams reduce cloud incidents without increasing headcount.</p></div><div className="received"><small>{messages[active][0]} · Today, 09:42</small><p>{messages[active][2]}</p></div><div className="intent"><Lightbulb/><p><b>Positive intent detected</b>Suggested next action: share the one-page overview and propose two meeting times.</p></div></div><div className="composer"><textarea aria-label="Reply" placeholder="Write a reply..."/><div><button><FileText/></button><Button icon={Send}>Send reply</Button></div></div></article><aside className="panel contactSide"><h3>Contact details</h3><span className="avatar large">{messages[active][0].slice(0,2)}</span><h2>{messages[active][0]}</h2><p>VP, Operations</p><hr/><small>COMPANY</small><b>Nomba</b><small>FIT SCORE</small><b>92 · Strong</b><small>CAMPAIGN</small><b>Fintech operations leaders</b><hr/><button>Open full contact <ArrowRight/></button></aside></section>}
-function Analytics(){return <><section className="stats"><Stat label="Prospects researched" value="1,284" delta="↑ 22.4%" icon={Search}/><Stat label="Positive replies" value="46" delta="↑ 8.1%" icon={MessageSquareText} tone="blue"/><Stat label="Opportunities" value="23" delta="↑ 12.6%" icon={BriefcaseBusiness} tone="amber"/><Stat label="Verified revenue" value="₦18.6M" delta="↑ 24.8%" icon={TrendingUp} tone="purple"/></section><section className="analyticsGrid"><article className="panel funnel"><PanelTitle title="Acquisition funnel" sub="Conversion from approved prospect to closed revenue" action="Last 90 days"/>{[['Approved prospects',846,100],['Contacted',612,72],['Replied',94,38],['Meetings',42,24],['Opportunities',23,15],['Closed won',7,8]].map((x,i)=><div key={x[0]}><span>{x[0]}</span><i><em style={{width:x[2]+'%'}}/></i><b>{x[1]}</b>{i>0&&<small>{Math.round(x[1]/[846,612,94,42,23][i-1]*100)}%</small>}</div>)}</article><article className="panel channel"><PanelTitle title="Revenue by source" sub="Verified closed-won revenue" action="View details"/>{[['Targeted outbound','₦9.8M',53],['Referrals','₦4.6M',25],['Inbound','₦2.8M',15],['Partner','₦1.4M',7]].map((x,i)=><div key={x[0]}><span><i className={'dot d'+i}/>{x[0]}</span><b>{x[1]}</b><small>{x[2]}%</small></div>)}</article></section><Table title="Segment performance" columns={['Segment','Opportunities','Win rate','Revenue']} rows={[['Fintech operations','12','42%','₦11.6M'],['Professional services','7','29%','₦4.2M'],['Healthtech scale-ups','4','25%','₦2.8M']]}/></>}
-function Profile(){return <div className="settingsLayout"><nav className="panel settingsNav">{['Company profile','Sales context','Documents','Data & privacy'].map((x,i)=><button className={i===0?'active':''} key={x}>{x}<ChevronRight/></button>)}</nav><form className="panel settingsForm"><h2>Company profile</h2><p>This information helps Inem Acquire interpret your market and offers.</p><div className="logoUpload"><span className="avatar square large">A</span><div><Button kind="secondary">Change logo</Button><small>PNG, JPG or SVG · Max 2 MB</small></div></div><div className="formRow"><Field label="Registered company name" placeholder="Acme Technologies Ltd"/><Field label="Trading name" placeholder="Acme Technologies"/></div><div className="formRow"><Field label="Website" placeholder="https://acme.com"/><Field label="Industry" placeholder="Technology services"/></div><Field label="Company description" area placeholder="We help growing businesses..."/><div className="formSave"><span><CheckCircle2/> Changes saved</span><Button>Save changes</Button></div></form></div>}
-function SettingsPage({tab}){const title=pageMeta[tab][0];if(tab==='billing')return <div className="billing"><article className="currentPlan"><div><Pill tone="green">CURRENT PLAN</Pill><h2>Growth</h2><p>For teams scaling a measurable acquisition process.</p></div><div><b>₦275,000</b><small>per month · renews Dec 6</small><Button kind="secondary">Manage plan</Button></div></article><section className="usageGrid">{[['Prospect research','6,420','10,000'],['Contact enrichment','1,284','2,000'],['AI diagnosis runs','4','10'],['Team seats','4','8']].map((x,i)=><article className="panel" key={x[0]}><span><b>{x[0]}</b><small>{x[1]} of {x[2]} used</small></span><div className="progress"><i style={{width:[64,62,40,50][i]+'%'}}/></div></article>)}</section><Table title="Billing history" columns={['Invoice','Date','Amount','Status']} rows={[['INV-2026-1106','Nov 6, 2026','₦275,000','Paid'],['INV-2026-1006','Oct 6, 2026','₦275,000','Paid'],['INV-2026-0906','Sep 6, 2026','₦275,000','Paid']]}/></div>;if(tab==='integrations')return <div className="integrationGrid">{[['Google Workspace','Email and calendar','Connected'],['HubSpot','CRM synchronization','Available'],['Apollo','Contact enrichment','Connected'],['Slack','Team notifications','Available'],['Paystack','Subscription billing','Connected'],['Webhooks','Custom workflows','Configure']].map((x,i)=><article className="panel" key={x[0]}><span className={'integrationIcon i'+i}>{[Mail,Database,ContactRound,MessageSquareText,CreditCard,Zap].map((I,n)=>n===i?<I key={n}/>:null)}</span><div><h2>{x[0]}</h2><p>{x[1]}</p></div><Button kind={x[2]==='Connected'?'ghost':'secondary'}>{x[2]}</Button></article>)}</div>;if(tab==='team')return <Table title="Workspace members" columns={['Member','Role','Status','Last active']} rows={[['Ada Okafor','Owner','Active','Now'],['Tomi Adeyemi','Sales member','Active','12 min ago'],['Chidi Eze','Admin','Active','1 hour ago'],['Morenike A.','Viewer','Invited','-']]}/>;return <div className="settingsLayout"><nav className="panel settingsNav">{['General','Company','Team & permissions','Integrations','Notifications','Security','Data & privacy'].map((x,i)=><button className={i===0?'active':''} key={x}>{x}<ChevronRight/></button>)}</nav><form className="panel settingsForm"><h2>{title}</h2><p>Update the defaults used across your workspace.</p><Field label="Workspace name" placeholder="Acme Technologies"/><div className="formRow"><Field label="Default currency" placeholder="NGN - Nigerian naira"/><Field label="Time zone" placeholder="Africa/Lagos"/></div><div className="switchRow"><div><b>Weekly acquisition summary</b><p>Receive an evidence-based performance summary every Monday.</p></div><input type="checkbox" defaultChecked aria-label="Weekly acquisition summary"/></div><div className="switchRow"><div><b>AI recommendation alerts</b><p>Notify the team when a high-confidence action is available.</p></div><input type="checkbox" defaultChecked aria-label="AI recommendation alerts"/></div><div className="formSave"><span/><Button>Save changes</Button></div></form></div>}
-function Admin(){return <><section className="stats"><Stat label="Active workspaces" value="1,248" delta="↑ 8.4%" icon={Building2}/><Stat label="Monthly revenue" value="₦184M" delta="↑ 12.1%" icon={CircleDollarSign} tone="blue"/><Stat label="Jobs awaiting retry" value="7" delta="3 high priority" icon={RefreshCcw} tone="amber"/><Stat label="Platform health" value="99.97%" delta="All systems normal" icon={Activity} tone="purple"/></section><section className="adminGrid"><article className="panel"><PanelTitle title="Operational health" sub="Services and current status" action="View logs"/>{[['Application API','Operational'],['Background jobs','Degraded'],['Email delivery','Operational'],['Prospect data provider','Operational']].map((x,i)=><div className="healthRow" key={x[0]}><span><i className={i===1?'warn':''}/>{x[0]}</span><Pill tone={i===1?'amber':'green'}>{x[1]}</Pill></div>)}</article><article className="panel"><PanelTitle title="Usage alerts" sub="Workspaces requiring review" action="View all"/>{[['High enrichment volume','Kora Systems · 94% of quota'],['Payment retry required','Lattice Labs · 2 failed attempts'],['Unusual export activity','Vertex Group · 4 exports today']].map(x=><div className="alertRow" key={x[0]}><span><b>{x[0]}</b><small>{x[1]}</small></span><ChevronRight/></div>)}</article></section><Table title="Recent workspaces" columns={['Workspace','Plan','Members','Status']} rows={[['Kora Systems','Scale','24','Active'],['Lattice Labs','Growth','8','Payment due'],['Vertex Group','Scale','18','Review'],['Northstar AI','Foundation','3','Active']]}/></>}
-function Advisor(){const [asked,setAsked]=useState(false);return <section className="advisor"><div className="advisorIntro"><span><Lightbulb/></span><h2>What should your team focus on?</h2><p>Ask about campaigns, segments, deals or performance. Answers cite the workspace records used.</p><div>{['Which deals need attention today?','Why did our reply rate improve?','Which ICP is performing best?'].map(x=><button onClick={()=>setAsked(true)} key={x}>{x}<ArrowRight/></button>)}</div></div>{asked&&<div className="answer panel"><div className="aiLabel"><Lightbulb/> Inem Advisor <small>Just now</small></div><h2>Three deals need attention today.</h2><p><b>Nomba</b> has a proposal open for nine days with no scheduled follow-up. <b>Moniepoint</b> is expected to close this week, but procurement approval is unconfirmed. <b>SeamlessHR</b> replied positively yesterday and has no meeting task.</p><div className="sources"><b>Sources</b><span>3 deals</span><span>5 activities</span><span>4 tasks</span></div><div><Button>Open priority deals</Button><Button kind="secondary">Create follow-up tasks</Button></div><small className="disclaimer"><ShieldCheck/> Recommendations use authorized workspace data and require your approval before changes.</small></div>}<div className="advisorComposer"><textarea aria-label="Ask the advisor" placeholder="Ask about your sales performance..."/><button onClick={()=>setAsked(true)} aria-label="Send question"><ArrowRight/></button></div></section>}
-function NotFound(){return <main className="notFound"><Brand/><h1>That page isn’t in this workspace.</h1><p>The link may be outdated or you may not have access.</p><Button as={Link} to="/app/dashboard">Return to dashboard</Button></main>}
-export default function App(){return <Routes><Route path="/" element={<Home/>}/>{routes.public.slice(1).map(p=>p==='/book-demo'?<Route key={p} path={p} element={<ContactPage demo/>}/>:p==='/contact'?<Route key={p} path={p} element={<ContactPage/>}/>:<Route key={p} path={p} element={<MarketingPage type={p.split('/').pop()}/>}/>) }<Route path="/signup" element={<Auth mode="signup"/>}/><Route path="/login" element={<Auth mode="login"/>}/><Route path="/verify-email" element={<Auth mode="verify-email"/>}/><Route path="/forgot-password" element={<Auth mode="forgot-password"/>}/><Route path="/reset-password" element={<Auth mode="reset-password"/>}/><Route path="/invite/:token" element={<Auth mode="invite"/>}/>{onboardSteps.map(s=><Route key={s} path={'/onboarding/'+s} element={<Onboarding step={s}/>}/>)}<Route path="/app/dashboard" element={<Dashboard/>}/>{appRoutes.map(n=><Route key={n} path={'/app/'+n} element={<GenericPage name={n}/>}/>)}<Route path="/app/offers/:id" element={<GenericPage name="offers"/>}/><Route path="/app/diagnosis/:id" element={<GenericPage name="diagnosis"/>}/><Route path="/app/ideal-customers/:id" element={<GenericPage name="ideal-customers"/>}/><Route path="/app/deals/:id" element={<GenericPage name="deals"/>}/><Route path="/auth/callback" element={<Navigate to="/app/dashboard" replace/>}/><Route path="*" element={<NotFound/>}/></Routes>}
+function DemoSection() {
+  return (
+    <section className="demoSection" id="demo">
+      <div className="demoCopy">
+        <span className="blueKicker">See it with your own sales process</span>
+        <h2>Request a personalized demo.</h2>
+        <p>
+          Tell us what your team sells and where acquisition feels difficult.
+          We’ll show you how the connected workflow can help.
+        </p>
+      </div>
+      <LiveDemoForm />
+    </section>
+  );
+}
+function MarketingPage({ type }) {
+  const data = {
+    "how-it-works": [
+      "A connected path from diagnosis to revenue",
+      "Replace disconnected tools and unclear handoffs with one measurable acquisition process.",
+    ],
+    features: [
+      "Every tool your team needs to acquire customers",
+      "Research, engagement, pipeline and reporting-built around your offers and ideal customers.",
+    ],
+    pricing: [
+      "Start focused. Scale when the process works.",
+      "Clear plans with explicit research, enrichment and outreach limits.",
+    ],
+    solutions: [
+      "Designed for considered B2B sales",
+      "Practical workflows for SaaS companies, agencies and professional service teams.",
+    ],
+    "b2b-saas": [
+      "Build a repeatable SaaS pipeline",
+      "Connect product positioning, target accounts, multi-threaded outreach and revenue evidence.",
+    ],
+    agencies: [
+      "Win more of the right client work",
+      "Find accounts that value your specialty and keep every opportunity moving.",
+    ],
+    "service-businesses": [
+      "Turn expertise into consistent opportunities",
+      "Package your offer, target best-fit buyers and build a reliable follow-up rhythm.",
+    ],
+    about: [
+      "Built to make acquisition less uncertain",
+      "Inem Acquire helps teams make better sales decisions with evidence, clarity and control.",
+    ],
+    blog: [
+      "Ideas for more predictable growth",
+      "Practical guides for finding, engaging and converting the right customers.",
+    ],
+    security: [
+      "Your sales data stays yours",
+      "Tenant isolation, least-privilege access and audit-ready controls by design.",
+    ],
+    privacy: [
+      "Privacy at Inem Acquire",
+      "How we collect, use and protect account and workspace information.",
+    ],
+    terms: [
+      "Terms of service",
+      "The terms that govern use of the Inem Acquire platform.",
+    ],
+    "acceptable-use": [
+      "Responsible platform use",
+      "Rules designed to keep prospecting respectful, lawful and useful.",
+    ],
+    "data-processing": [
+      "Data processing information",
+      "How Inem Acquire handles customer data and service providers.",
+    ],
+  }[type];
+  return (
+    <>
+      <PublicNav />
+      <main className="marketing">
+        <section className="pageHero">
+          <Pill tone="green">INEM ACQUIRE</Pill>
+          <h1>{data[0]}</h1>
+          <p>{data[1]}</p>
+          <Button as={Link} to={type === "pricing" ? "/signup" : "/book-demo"}>
+            {type === "pricing" ? "Start free" : "See Inem Acquire"}{" "}
+            <ArrowRight size={16} />
+          </Button>
+        </section>
+        {type === "pricing" ? (
+          <Pricing />
+        ) : type === "blog" ? (
+          <Blog />
+        ) : (
+          <FeatureBlocks type={type} />
+        )}
+      </main>
+      <PublicFooter />
+    </>
+  );
+}
+function FeatureBlocks({ type }) {
+  const items = [
+    [
+      "Evidence before opinions",
+      "Every finding links back to known facts, supplied information or a clearly marked assumption.",
+    ],
+    [
+      "A workflow your team can follow",
+      "From discovery to follow-up, each record has a clear owner and next action.",
+    ],
+    [
+      "Human control by default",
+      "Your team reviews contacts, messaging and major changes before they happen.",
+    ],
+  ];
+  return (
+    <section className="featureBlocks">
+      {items.map((x, i) => (
+        <article key={x[0]}>
+          <span>0{i + 1}</span>
+          <div>
+            <h2>{x[0]}</h2>
+            <p>{x[1]}</p>
+            <Link to="/features">
+              Explore the capability <ArrowRight size={15} />
+            </Link>
+          </div>
+          <div className={"abstract a" + i}>
+            <Lightbulb />
+          </div>
+        </article>
+      ))}
+    </section>
+  );
+}
+function Pricing() {
+  return (
+    <section className="pricingGrid">
+      {[
+        [
+          "Foundation",
+          "₦95,000",
+          "For small teams building their first repeatable system.",
+        ],
+        [
+          "Growth",
+          "₦275,000",
+          "For teams ready to scale research, campaigns and reporting.",
+        ],
+        [
+          "Scale",
+          "Custom",
+          "For multi-team organizations with advanced controls.",
+        ],
+      ].map((p, i) => (
+        <article className={i === 1 ? "featured" : ""} key={p[0]}>
+          {i === 1 && <Pill tone="green">MOST POPULAR</Pill>}
+          <h2>{p[0]}</h2>
+          <p>{p[2]}</p>
+          <b>{p[1]}</b>
+          {p[1] !== "Custom" && <small>/ month</small>}
+          <Button
+            as={Link}
+            to="/signup"
+            kind={i === 1 ? "primary" : "secondary"}
+          >
+            Choose {p[0]}
+          </Button>
+          {[
+            "Connected sales workspace",
+            "ICP and prospect discovery",
+            "Campaign approval workflow",
+            "Pipeline and revenue reporting",
+          ].map((x) => (
+            <span className="checkLine" key={x}>
+              <Check /> {x}
+            </span>
+          ))}
+        </article>
+      ))}
+    </section>
+  );
+}
+function Blog() {
+  return (
+    <section className="blogGrid">
+      {[
+        "Why more leads rarely fix a broken sales process",
+        "How to create an ICP your team can actually use",
+        "The revenue evidence every B2B team should track",
+      ].map((x, i) => (
+        <article key={x}>
+          <div className={"blogArt b" + i} />
+          <Pill>
+            {i === 0 ? "STRATEGY" : i === 1 ? "TARGETING" : "MEASUREMENT"}
+          </Pill>
+          <h2>{x}</h2>
+          <p>
+            Practical guidance for building a more focused, measurable
+            acquisition system.
+          </p>
+          <Link to="#">
+            Read guide <ArrowRight size={15} />
+          </Link>
+        </article>
+      ))}
+    </section>
+  );
+}
+function ContactPage() {
+  return (
+    <>
+      <PublicNav />
+      <main className="marketing">
+        <DemoSection />
+      </main>
+      <PublicFooter />
+    </>
+  );
+}
+function NotFound() {
+  return (
+    <main className="notFound">
+      <Brand />
+      <h1>That page isn’t in this workspace.</h1>
+      <p>The link may be outdated or you may not have access.</p>
+      <Button as={Link} to="/app/dashboard">
+        Return to dashboard
+      </Button>
+    </main>
+  );
+}
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      {routes.public.slice(1).map((p) => (
+        <Route
+          key={p}
+          path={p}
+          element={
+            ["/book-demo", "/contact"].includes(p) ? (
+              <ContactPage />
+            ) : (
+              <MarketingPage type={p.split("/").pop()} />
+            )
+          }
+        />
+      ))}
+      {[
+        "signup",
+        "login",
+        "forgot-password",
+        "reset-password",
+        "verify-email",
+      ].map((mode) => (
+        <Route
+          key={mode}
+          path={"/" + mode}
+          element={<AuthPage key={mode} mode={mode} />}
+        />
+      ))}
+      <Route path="/auth/callback" element={<AuthPage mode="callback" />} />
+      <Route path="/invite/:token" element={<AuthPage mode="invite" />} />
+      <Route
+        path="/onboarding/*"
+        element={
+          <RequireAuth>
+            <SetupPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/app/*"
+        element={
+          <RequireAuth>
+            <LiveWorkspace />
+          </RequireAuth>
+        }
+      />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}

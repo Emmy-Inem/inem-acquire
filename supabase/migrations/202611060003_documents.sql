@@ -1,0 +1,16 @@
+begin;
+create table public.documents(id uuid primary key default gen_random_uuid(),organization_id uuid not null references public.organizations(id) on delete cascade,name text not null,path text not null unique,content_type text not null,size_bytes integer not null check(size_bytes between 1 and 5242880),uploaded_by uuid not null references public.profiles(id),created_at timestamptz not null default now());
+alter table public.documents enable row level security;
+create index documents_org on public.documents(organization_id);
+create policy documents_read on public.documents for select to authenticated using(private.org_access(organization_id));
+create policy documents_insert on public.documents for insert to authenticated with check(private.org_access(organization_id,'write') and uploaded_by=auth.uid());
+create policy documents_delete on public.documents for delete to authenticated using(private.org_access(organization_id,'approve'));
+grant select,insert,delete on public.documents to authenticated;
+grant all on public.documents to service_role;
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values('organization-documents','organization-documents',false,5242880,array['application/pdf','text/plain','text/csv']) on conflict(id) do nothing;
+create function private.storage_org(path text) returns uuid language sql immutable set search_path='' as $$select case when split_part(path,'/',1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then split_part(path,'/',1)::uuid else null end$$;
+grant execute on function private.storage_org(text) to authenticated;
+create policy acquire_documents_read on storage.objects for select to authenticated using(bucket_id='organization-documents' and private.org_access(private.storage_org(name)));
+create policy acquire_documents_upload on storage.objects for insert to authenticated with check(bucket_id='organization-documents' and private.org_access(private.storage_org(name),'write'));
+create policy acquire_documents_delete on storage.objects for delete to authenticated using(bucket_id='organization-documents' and private.org_access(private.storage_org(name),'approve'));
+commit;

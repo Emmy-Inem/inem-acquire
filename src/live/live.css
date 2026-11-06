@@ -1,0 +1,480 @@
+.liveState {
+  padding: 55px 24px;
+  text-align: center;
+  color: #52647e;
+}
+.liveState h1,
+.liveState h2 {
+  color: #102342;
+}
+.liveError {
+  padding: 15px 18px;
+  background: #fff0f0;
+  border: 1px solid #f1c5c8;
+  color: #8c2330;
+  border-radius: 10px;
+  margin: 15px 0;
+  line-height: 1.6;
+}
+.liveNotice {
+  padding: 16px 18px;
+  border: 1px solid #c8daf8;
+  background: #eef4ff;
+  color: #254d86;
+  border-radius: 10px;
+  margin: 15px 0;
+  line-height: 1.6;
+}
+.liveNotice a {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 700;
+}
+.liveNotice input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #a8bddf;
+  border-radius: 7px;
+}
+.authSecondary {
+  display: block;
+  margin: 18px 0;
+  color: #0757f6;
+  font-size: 12px;
+}
+.liveSetup {
+  max-width: 660px;
+  margin: 45px auto;
+  padding: 20px;
+}
+.liveSetup > .brand {
+  margin-bottom: 40px;
+}
+.liveSetup > form {
+  padding: 35px;
+}
+.liveSetup h1 {
+  font-size: 34px;
+  margin: 18px 0;
+}
+.liveSetup p {
+  line-height: 1.8;
+  color: #5c6d87;
+}
+.liveSetup .btn {
+  margin-top: 12px;
+}
+.liveWorkspaceSelect {
+  gap: 10px;
+  padding: 12px;
+}
+.liveWorkspaceSelect select {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: #102342;
+  font: 600 12px inherit;
+}
+.liveWorkspaceSelect svg {
+  color: #0757f6;
+}
+.liveBreadcrumb {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+.liveBreadcrumb > span {
+  border-left: 1px solid #d5dfef;
+  padding-left: 18px;
+  color: #5c6d87;
+}
+.userChip > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+.userChip b {
+  overflow-wrap: anywhere;
+}
+.userChip button {
+  border: 0;
+  background: transparent;
+  color: #52647e;
+  padding: 5px;
+}
+.appMain .pageHeader p {
+  max-width: 780px;
+}
+.supportBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 26px;
+  border-bottom: 1px solid #efc16d;
+  background: #fff5dc;
+  color: #74500b;
+  font-size: 12px;
+}
+.supportBanner > span {
+  flex: 1;
+}
+.supportBanner small {
+  display: block;
+  margin-top: 4px;
+}
+.supportBanner button {
+  border: 1px solid #c59642;
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px 12px;
+  color: #74500b;
+}
+.liveSearch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+}
+.liveSearch > input {
+  border: 0;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  outline-offset: 0;
+}
+.liveSearch .btn {
+  min-height: 36px;
+}
+.liveRecords td {
+  max-width: 330px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.liveRowActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 100px;
+}
+.liveRowActions button {
+  border: 0;
+  background: transparent;
+  color: #0752cf;
+  font-size: 11px;
+  padding: 5px 0;
+  text-align: left;
+}
+.liveRowActions button:hover {
+  text-decoration: underline;
+}
+.liveModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: #10234266;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.liveModal {
+  width: min(600px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 30px;
+  box-shadow: 0 20px 70px #10234233;
+}
+.liveModal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 20px;
+}
+.liveModal h2 {
+  font-size: 22px;
+  margin: 0;
+}
+.liveModal header button {
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 40px;
+}
+.liveModal p {
+  line-height: 1.7;
+  color: #5c6d87;
+}
+.field select,
+.liveMetric select {
+  border: 1px solid #cbd5e5;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  color: #102342;
+  width: 100%;
+  min-height: 44px;
+  font: inherit;
+}
+.field small {
+  color: #5c6d87;
+  font-size: 10px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.field > textarea {
+  min-height: 120px;
+}
+.liveFormActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 25px;
+}
+.liveTwoColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 20px 0;
+}
+.livePanel {
+  padding: 28px;
+  margin: 20px 0;
+}
+.liveTwoColumns > .livePanel {
+  margin: 0;
+}
+.livePanel h2 {
+  font-size: 20px;
+  margin-bottom: 20px;
+}
+.livePanel > p {
+  color: #5c6d87;
+  line-height: 1.75;
+}
+.livePanel > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #0757f6;
+  font-weight: 600;
+  font-size: 12px;
+  margin-top: 20px;
+}
+.liveMetric {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  justify-content: space-between;
+  padding: 18px 0;
+  border-bottom: 1px solid #e2e8f2;
+}
+.liveMetric > span {
+  flex: 1;
+  min-width: 0;
+}
+.liveMetric small {
+  display: block;
+  color: #5c6d87;
+  font-size: 11px;
+  margin-top: 5px;
+}
+.liveMetric select {
+  width: auto;
+  max-width: 150px;
+}
+.liveMetric > .btn {
+  flex-shrink: 0;
+}
+.liveTask {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid #e2e8f2;
+}
+.liveTask small {
+  display: block;
+  font-size: 11px;
+  color: #5c6d87;
+  margin-top: 5px;
+}
+.liveTask button {
+  display: grid;
+  place-items: center;
+  border: 1px solid #c4d1e5;
+  background: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: #0757f6;
+}
+.liveTask button:hover {
+  background: #e8f0ff;
+}
+.liveScope {
+  font-size: 11px;
+  color: #5c6d87;
+  line-height: 1.7;
+}
+.liveEvidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-size: 12px;
+  margin-top: 20px;
+}
+.liveEvidence span {
+  color: #536887;
+}
+.liveEvidence b {
+  margin-left: 6px;
+  color: #102342;
+}
+.liveScore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 130px;
+}
+.liveScore strong {
+  font-size: 58px;
+  line-height: 1.2;
+}
+.liveScore small {
+  color: #e0eaff;
+}
+.liveImport {
+  padding: 18px 0;
+}
+.liveImport small {
+  display: block;
+  margin-top: 10px;
+  color: #5c6d87;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.liveImport p {
+  font-size: 12px;
+}
+.liveMessageBody {
+  white-space: pre-wrap;
+  line-height: 1.8;
+}
+.liveKanban {
+  grid-template-columns: repeat(6, minmax(220px, 1fr));
+  overflow-x: auto;
+  padding-bottom: 20px;
+}
+.liveKanban .kanbanCol {
+  min-width: 220px;
+}
+.liveKanban .field {
+  margin-top: 15px;
+  margin-bottom: 0;
+}
+.liveKanban .field select {
+  font-size: 11px;
+  padding: 9px;
+}
+.livePanel .btn {
+  margin-top: 10px;
+}
+.liveTwoColumns .inboxList {
+  height: auto;
+  max-height: 600px;
+  overflow-y: auto;
+}
+.liveTwoColumns .inboxList > button {
+  padding: 20px;
+}
+.liveTwoColumns .inboxList p {
+  white-space: normal;
+}
+.appTop > .btn {
+  min-height: 40px;
+  font-size: 11px;
+}
+.liveSetup .field input:disabled,
+.field textarea:disabled {
+  background: #f4f7fb;
+  color: #62738e;
+}
+@media (max-width: 800px) {
+  .liveTwoColumns {
+    grid-template-columns: 1fr;
+  }
+  .livePanel {
+    padding: 20px;
+  }
+  .liveBreadcrumb {
+    font-size: 11px;
+    gap: 8px;
+    max-width: 58%;
+    flex-wrap: wrap;
+  }
+  .liveBreadcrumb > span {
+    border: 0;
+    padding: 0;
+  }
+  .appTop > .btn {
+    font-size: 10px;
+    padding: 0 12px;
+  }
+  .liveModalBackdrop {
+    padding: 12px;
+  }
+  .liveModal {
+    padding: 20px;
+    max-height: 95vh;
+  }
+  .liveMetric {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .liveMetric > .btn {
+    font-size: 10px;
+  }
+  .supportBanner {
+    padding: 12px 15px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .supportBanner button {
+    margin-left: auto;
+  }
+  .liveSetup {
+    margin-top: 20px;
+  }
+  .liveSetup > form {
+    padding: 24px;
+  }
+  .liveSetup h1 {
+    font-size: 28px;
+  }
+  .liveScore {
+    margin-top: 20px;
+  }
+  .liveSearch {
+    padding: 6px;
+    gap: 2px;
+  }
+  .liveRecords td {
+    min-width: 120px;
+  }
+  .liveEvidence {
+    gap: 12px;
+  }
+}
+.liveRecords{min-width:0;max-width:100%;overflow:hidden}.liveRecords .tableScroll{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}.liveRecords table{width:max-content;min-width:100%}
