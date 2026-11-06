@@ -134,7 +134,7 @@ export function createApp({
   const credentials = z
     .object({
       email: z.string().email().max(254),
-      password: z.string().min(10).max(128),
+      password: z.string().min(6).max(128),
       full_name: z.string().trim().min(2).max(120).optional(),
     })
     .strict();
@@ -200,9 +200,16 @@ export function createApp({
     wrap(async (req, res) => {
       configured();
       const { email } = z.object({ email: z.string().email() }).parse(req.body);
-      await makeClient().auth.resetPasswordForEmail(email, {
+      const { error } = await makeClient().auth.resetPasswordForEmail(email, {
         redirectTo: origin + "/reset-password",
       });
+      if (error)
+        return res.status(error.status === 429 ? 429 : 503).json({
+          error:
+            error.status === 429
+              ? "Please wait a few minutes before requesting another reset link."
+              : "We could not send a reset link right now. Please try again shortly.",
+        });
       res.json({
         success: true,
         message: "If an account exists, a reset link will be sent.",
@@ -258,10 +265,11 @@ export function createApp({
   const auth = wrap(async (req, res, next) => {
     configured();
     let token = cookieValue(req, cookies.access);
+    let refreshToken = cookieValue(req, cookies.refresh);
     let db = makeClient(token);
     let response = token ? await db.auth.getUser(token) : { error: true };
     if (response.error) {
-      const refresh = cookieValue(req, cookies.refresh);
+      const refresh = refreshToken;
       if (!refresh) {
         clearSession(res);
         return res.status(401).json({ error: "Sign in to continue" });
@@ -277,12 +285,14 @@ export function createApp({
       }
       setSession(res, rotated.data.session);
       token = rotated.data.session.access_token;
+      refreshToken = rotated.data.session.refresh_token;
       db = makeClient(token);
       response = { data: { user: rotated.data.user } };
     }
     req.user = response.data.user;
     req.db = db;
     req.jwt = token;
+    req.refreshToken = refreshToken;
     next();
   });
   const organization = (capability) =>
@@ -360,11 +370,30 @@ export function createApp({
     auth,
     wrap(async (req, res) => {
       const { password } = z
-        .object({ password: z.string().min(10).max(128) })
+        .object({ password: z.string().min(6).max(128) })
         .parse(req.body);
-      const { error } = await req.db.auth.updateUser({ password });
+      const db = makeClient();
+      const { data: restored, error: sessionError } = await db.auth.setSession({
+        access_token: req.jwt,
+        refresh_token: req.refreshToken || "",
+      });
+      if (sessionError || !restored.session)
+        return res
+          .status(401)
+          .json({
+            error: "Your reset session expired. Request a new reset link.",
+          });
+      const { error } = await db.auth.updateUser({ password });
       if (error)
-        return res.status(400).json({ error: "Password could not be updated" });
+        return res
+          .status(400)
+          .json({
+            error:
+              error.code === "same_password"
+                ? "Choose a different password from your current one."
+                : "Password could not be updated. Use at least 6 characters and try again.",
+          });
+      setSession(res, restored.session);
       res.json({ success: true });
     }),
   );

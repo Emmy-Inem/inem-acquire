@@ -31,6 +31,10 @@ export function AuthPage({ mode }) {
     [name, setName] = useState(""),
     [password, setPassword] = useState(""),
     [pending, setPending] = useState(false),
+    [checkingLink, setCheckingLink] = useState(
+      ["callback", "reset-password"].includes(mode),
+    ),
+    [resetReady, setResetReady] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const title = {
@@ -45,9 +49,25 @@ export function AuthPage({ mode }) {
   useEffect(() => {
     if (!["callback", "reset-password"].includes(mode)) return;
     let active = true;
+    setCheckingLink(true);
+    setResetReady(false);
     const exchange = async () => {
       const fragment = new URLSearchParams(window.location.hash.slice(1)),
         query = new URLSearchParams(location.search);
+      const recovery =
+        mode === "reset-password" ||
+        fragment.get("type") === "recovery" ||
+        query.get("type") === "recovery";
+      if (window.location.hash || query.has("token_hash") || query.has("error"))
+        window.history.replaceState(
+          window.history.state,
+          "",
+          location.pathname,
+        );
+      if (fragment.has("error") || query.has("error"))
+        throw new Error(
+          "This link has expired or is invalid. Request a new link and open the latest email.",
+        );
       if (fragment.get("access_token")) {
         await api("/auth/session", {
           method: "POST",
@@ -56,32 +76,45 @@ export function AuthPage({ mode }) {
             refresh_token: fragment.get("refresh_token"),
           },
         });
-        history.replaceState(null, "", location.pathname);
         await refresh();
-        if (mode === "callback" && active)
-          navigate("/app/dashboard", { replace: true });
+        if (active) {
+          setResetReady(recovery);
+          if (mode === "callback")
+            navigate(recovery ? "/reset-password" : "/app/dashboard", {
+              replace: true,
+            });
+        }
       } else if (query.get("token_hash")) {
         await api("/auth/exchange", {
           method: "POST",
           body: {
             token_hash: query.get("token_hash"),
-            type: query.get("type") || "email",
+            type: query.get("type") || (recovery ? "recovery" : "email"),
           },
         });
         await refresh();
-        if (active)
-          navigate(
-            query.get("type") === "recovery"
-              ? "/reset-password"
-              : "/app/dashboard",
-            { replace: true },
-          );
+        if (active) {
+          setResetReady(recovery);
+          navigate(recovery ? "/reset-password" : "/app/dashboard", {
+            replace: true,
+          });
+        }
       } else if (mode === "callback")
         throw new Error(
           "This link is incomplete. Open the latest verification email or sign in.",
         );
+      else {
+        const session = await refresh();
+        if (!session)
+          throw new Error(
+            "Open the reset link in your email to choose a new password.",
+          );
+        if (active) setResetReady(true);
+      }
     };
-    exchange().catch((e) => active && setError(e.message));
+    exchange()
+      .catch((e) => active && setError(e.message))
+      .finally(() => active && setCheckingLink(false));
     return () => {
       active = false;
     };
@@ -117,6 +150,8 @@ export function AuthPage({ mode }) {
         );
       }
       if (mode === "reset-password") {
+        if (!resetReady)
+          throw new Error("Open a valid password reset link first.");
         await api("/auth/password", { method: "POST", body: { password } });
         setNotice("Password updated. You can return to your workspace.");
       }
@@ -216,12 +251,12 @@ export function AuthPage({ mode }) {
                       mode === "login" ? "current-password" : "new-password"
                     }
                     required
-                    minLength={10}
+                    minLength={6}
                     maxLength={128}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
-                  <small>Use at least 10 characters.</small>
+                  <small>Use at least 6 characters.</small>
                 </label>
               )}
               {mode === "invite" && (
@@ -234,7 +269,13 @@ export function AuthPage({ mode }) {
                 </p>
               )}
               {!["verify-email", "callback"].includes(mode) && (
-                <button className="btn primary" disabled={pending}>
+                <button
+                  className="btn primary"
+                  disabled={
+                    pending ||
+                    (mode === "reset-password" && (!resetReady || checkingLink))
+                  }
+                >
                   {pending
                     ? "Please wait…"
                     : {
@@ -272,6 +313,14 @@ export function AuthPage({ mode }) {
           )}
           {mode === "callback" && !error && (
             <p role="status">Completing your sign-in…</p>
+          )}
+          {mode === "reset-password" && checkingLink && (
+            <p role="status">Checking your reset link…</p>
+          )}
+          {mode === "reset-password" && error && !resetReady && (
+            <Link className="authSecondary" to="/forgot-password">
+              Request a new reset link
+            </Link>
           )}
         </form>
       </section>

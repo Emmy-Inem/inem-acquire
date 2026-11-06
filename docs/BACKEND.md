@@ -79,7 +79,7 @@ supabase functions deploy sales-intelligence
 supabase functions deploy campaign-delivery
 ```
 
-Deploy the repository to a Node-capable host or Vercel. The repository includes a Vercel API entrypoint and rewrites. Set server environment variables from `.env.example`; set `APP_URL` to the actual HTTPS website origin. In Supabase Auth, set the same Site URL and allow `/auth/callback` and `/reset-password` on that origin. Local URLs are currently configured for development. A public website deployment has not been performed as part of this backend implementation.
+The production website is https://inem-acquire.vercel.app. Set server environment variables from `.env.example`; `APP_URL` must match the actual HTTPS website origin. Supabase Auth uses this production Site URL, with `/auth/callback` and `/reset-password` allowed on both production and local development origins. Passwords require at least six characters in the forms, API and hosted Supabase Auth configuration. Recovery links are exchanged into HttpOnly session cookies before password updates, and expired/used links offer a new reset request.
 
 ## Deferred provider activation
 
@@ -102,6 +102,7 @@ Delivery is explicit, approval-gated and idempotent per recipient. Ambiguous pro
 npm test
 npm run test:integration
 node tests/browser.js
+node tests/password-reset.integration.js
 ```
 
 Integration tests create and remove uniquely named fixture users and organizations in the configured project. They do not send emails, charge a card or run provider searches. Browser checks require installed Chrome and the local API/Vite servers. RLS, roles, cross-tenant references, support access, campaign approval, signature checks, cookies and real record persistence are covered. Production-provider delivery and payment capture remain untested until those services are activated.
