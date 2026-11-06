@@ -30,8 +30,8 @@ export default function HeroVideo() {
   return <>
     <div className="heroVideoBackdrop" aria-hidden="true">
       <video ref={videoRef} muted loop playsInline preload={reducedMotion ? "none" : "metadata"}
-        poster="/images/hero-team-poster.jpg" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}>
-        {!reducedMotion && <source src="/videos/hero-team.mp4" type="video/mp4" />}
+        poster="/images/hero-collaboration-poster.jpg" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}>
+        {!reducedMotion && <source src="/videos/hero-team-collaboration.mp4" type="video/mp4" />}
       </video>
     </div>
     {!reducedMotion && <button type="button" className="heroVideoToggle" aria-label={playing ? "Pause background video" : "Play background video"}

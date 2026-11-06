@@ -2,12 +2,12 @@
 
 ## Landing-page hero video
 
-- Video: People Working Using a Laptop
-- Creator: MART PRODUCTION
-- Source: https://www.pexels.com/video/people-working-using-a-laptop-7534419/
+- Video: Two Women Talking Business
+- Creator: Tima Miroshnichenko
+- Source: https://www.pexels.com/video/two-women-talking-business-5717542/
 - License: https://www.pexels.com/license/
-- Local files: public/videos/hero-team.mp4 and public/images/hero-team-poster.jpg
-- Treatment: first 10 seconds, silent H.264 encode, responsive crop and dark CSS overlays. Poster is the first video frame. No generative imagery or artificial blur.
+- Local files: public/videos/hero-team-collaboration.mp4 and public/images/hero-collaboration-poster.jpg
+- Treatment: 28 seconds of source footage converted to a 27-second silent H.264 loop, using a one-second tail/head crossfade. Cropped to remove excess headroom and bring faces higher into the hero. Responsive framing and dark CSS overlays; poster is the first output frame. No generative imagery or artificial blur.
 - Muted looping playback includes a pause control, pauses offscreen, and uses the poster instead when reduced motion is requested.
 - Illustrative stock footage; no endorsement by the depicted people is implied.
 
