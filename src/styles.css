@@ -165,7 +165,12 @@ body{font-family:'Plus Jakarta Sans',Arial,sans-serif;background:#f7f9fc}h1,h2,h
 :root{--glass-surface:rgba(16,20,28,.36);--glass-blur:blur(14px) saturate(120%);--glass-edge:rgba(255,255,255,.38);--glass-shadow:0 6px 24px rgba(0,0,0,.08),inset 0 1px 0 rgba(255,255,255,.08)}
 .marketingSite>.publicNav,.heroSignup,.capabilityMedia>div,.btn.glass{background:var(--glass-surface);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border-color:var(--glass-edge);box-shadow:var(--glass-shadow)}
 .marketingSite .capabilityMedia>div,.marketingSite .capabilityMedia>div b{color:#fff}.marketingSite .capabilityMedia>div span{color:#d9e6ff}.marketingSite .capabilityMedia>div small{color:#e0eaff}
-/* Real stock photography; blur is isolated from the content and glass controls. */
+/* Stock video stays clear; overlays preserve contrast beneath the glass controls. */
 .marketingSite .heroFrame{background-image:none;background-color:#10151f;overflow:hidden;isolation:isolate}
-.marketingSite .heroBackdrop{position:absolute;inset:-10px;z-index:0;background-image:linear-gradient(90deg,rgba(11,16,29,.82),rgba(11,16,29,.40) 58%,rgba(11,16,29,.50)),linear-gradient(0deg,rgba(16,21,31,.94),transparent 65%),var(--hero-image);background-size:cover;background-position:center 42%;filter:blur(3px);pointer-events:none}
-@media(max-width:800px){.marketingSite .heroBackdrop{background-position:48% top}}
+.marketingSite .heroVideoBackdrop{position:absolute;inset:0;z-index:0;pointer-events:none;background:#10151f}
+.heroVideoBackdrop video{width:100%;height:100%;object-fit:cover;object-position:center}
+.heroVideoBackdrop:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(11,16,29,.78),rgba(11,16,29,.32) 58%,rgba(11,16,29,.42)),linear-gradient(0deg,rgba(16,21,31,.92),transparent 65%)}
+.heroVideoToggle{position:absolute;z-index:2;bottom:18px;right:24px;display:flex;align-items:center;gap:7px;min-height:36px;padding:8px 12px;border:1px solid #ffffff55;border-radius:8px;background:#10151f88;color:#fff;font:inherit;font-size:11px;cursor:pointer}
+.heroVideoToggle:hover{background:#10151fcc}
+.heroVideoToggle:focus-visible{outline:2px solid #fff;outline-offset:4px}
+@media(max-width:800px){.heroVideoBackdrop video{height:650px;object-position:35% center}.heroVideoBackdrop:after{background:linear-gradient(90deg,rgba(11,16,29,.72),rgba(11,16,29,.35)),linear-gradient(0deg,#10151f calc(100% - 650px),transparent calc(100% - 450px))}.heroVideoToggle{top:92px;bottom:auto;right:24px;width:max-content}}

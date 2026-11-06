@@ -3,6 +3,7 @@ import { RequireAuth } from "./live/AuthContext";
 import { LiveWorkspace } from "./live/Workspace";
 import { AnimatedPreview } from "./PlatformMotion";
 import WorkflowPreview from "./WorkflowPreview";
+import HeroVideo from "./HeroVideo";
 import React, { useMemo, useState } from "react";
 import {
   Link,
@@ -63,8 +64,6 @@ import {
   Zap,
 } from "lucide-react";
 
-const stockTeam =
-  "/images/hero-team.jpg";
 const stockFounder =
   "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&q=85&w=1600";
 const stockFocus =
@@ -315,9 +314,9 @@ function Home() {
       <PublicNav dark onePage />
       <div
         className="heroFrame"
-        style={{ "--hero-image": `url(${stockTeam})` }}
       >
-        <div className="heroBackdrop" aria-hidden="true"/><section className="humanHero">
+        <HeroVideo />
+        <section className="humanHero">
           <div className="heroCopy">
             <span className="heroKicker">
               A clearer way to acquire customers
