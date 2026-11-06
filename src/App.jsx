@@ -64,7 +64,7 @@ import {
 } from "lucide-react";
 
 const stockTeam =
-  "https://images.pexels.com/photos/3869649/pexels-photo-3869649.jpeg?auto=compress&cs=tinysrgb&w=1800";
+  "/images/hero-team.jpg";
 const stockFounder =
   "https://images.unsplash.com/photo-1573164713712-03790a178651?auto=format&fit=crop&q=85&w=1600";
 const stockFocus =
@@ -317,7 +317,7 @@ function Home() {
         className="heroFrame"
         style={{ "--hero-image": `url(${stockTeam})` }}
       >
-        <section className="humanHero">
+        <div className="heroBackdrop" aria-hidden="true"/><section className="humanHero">
           <div className="heroCopy">
             <span className="heroKicker">
               A clearer way to acquire customers
