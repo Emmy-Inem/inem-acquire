@@ -298,7 +298,7 @@ export default function ProspectResearch({ onSaved }) {
           <h2 id="lead-finder-title">Find companies and public contacts</h2>
           <p>
             Search the Nigerian business catalog by name, location or industry.
-            Open the sources or check a business website for more details.
+            Verify a business website before opening its link.
           </p>
         </div>
       </div>

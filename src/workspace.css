@@ -1017,3 +1017,10 @@
   .appShell .leadTable td:first-child { padding: 0 0 4px; }
   .appShell .leadTable tr { padding: 14px 0; }
 }
+.leadWebsiteStatus {
+  display: block;
+  margin-top: 4px;
+  color: #61708a;
+  font-size: 11px;
+  line-height: 1.5;
+}

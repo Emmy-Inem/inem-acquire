@@ -1758,7 +1758,7 @@ function DiagnosisPage({ write }) {
                       (f.source === "icps" ? "ideal-customers" : f.source)
                     }
                   >
-                    Review {f.source}
+                    Review {f.source === "icps" ? "ideal customers" : f.source}
                     <ArrowRight size={14} />
                   </Link>
                 </article>
@@ -1767,7 +1767,7 @@ function DiagnosisPage({ write }) {
             {!!latest.evidence?.gemini_steps?.length && (
               <article className="panel livePanel">
                 <h2>Suggested next steps</h2>
-                <p>Gemini suggestions based on the types of findings above.</p>
+                <p>Suggestions based on the types of findings above.</p>
                 <ol>
                   {latest.evidence.gemini_steps.map((step, index) => (
                     <li key={index}>{step}</li>
