@@ -28,6 +28,7 @@ export async function searchCatalog(db, { city, country, industry, keyword, page
       website: row.website_status === "verified" && Date.parse(row.website_checked_at) > Date.now() - 30 * 86400000
         ? webUrl(row.website) : null,
       hasWebsite: !!webUrl(row.website),
+      websiteHost: webUrl(row.website) ? new URL(webUrl(row.website)).hostname.replace(/^www\./, "") : null,
       websiteStatus: row.website_status === "verified" && !(Date.parse(row.website_checked_at) > Date.now() - 30 * 86400000)
         ? "unreviewed" : row.website_status,
       city: row.city,

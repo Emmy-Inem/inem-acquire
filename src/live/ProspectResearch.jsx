@@ -1,5 +1,6 @@
+import { ArrowRight, BookmarkPlus, Building2, Check, ChevronLeft, ChevronRight, CircleAlert, Globe2, LoaderCircle, Search, Sparkles, X } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { industries } from "../../shared/research";
 import { api } from "./api";
 import { useAuth } from "./AuthContext";
@@ -59,6 +60,58 @@ function contactInfo(row, checked) {
   };
 }
 
+function displayWebsite(row, result) {
+  if (result?.websiteStatus === "verified") return result.website;
+  if (result && row.catalog) return null;
+  if (row.websiteStatus === "verified" || (!row.directory && !row.catalog)) return row.website;
+  return null;
+}
+
+function companyName(row, info) {
+  return row.directory || row.catalog ? row.name
+    : info.pages.find((page) => page.details?.name)?.details.name || row.name;
+}
+
+function SiteCheck({ row, result, busy, disabled, onCheck }) {
+  const website = displayWebsite(row, result);
+  const host = website ? new URL(website).hostname.replace(/^www\./, "") : row.websiteHost;
+  const checked = !!result;
+  const confirmed = result?.websiteStatus === "verified";
+  const failed = checked && !confirmed && (result.error || row.catalog);
+  const unavailable = result?.websiteStatus === "unavailable" || row.websiteStatus === "unavailable";
+  const contacts = contactInfo(row, result);
+  return (
+    <div className="leadSiteCheck">
+      <div className="leadSiteLine">
+        {website ? (
+          <a href={website} target="_blank" rel="noreferrer" className="leadDomain"><Globe2 size={13} /> {host}</a>
+        ) : host ? <span className="leadDomain leadMuted"><Globe2 size={13} /> {host}</span> : null}
+        {(row.hasWebsite || row.website) && (
+          <button type="button" className="leadInlineAction" disabled={disabled && !busy}
+            aria-label={(busy ? "Cancel website check for " : "Check website for ") + row.name}
+            onClick={onCheck}>
+            {busy ? <><LoaderCircle size={13} className="workspaceSpinner" /> Checking… <X size={12} /></>
+              : <><Search size={13} /> {failed ? "Try again" : checked ? "Recheck site" : "Check site"}</>}
+          </button>
+        )}
+      </div>
+      {busy ? <p className="leadCheckOutcome" role="status">Opening the site and checking the business name and contact pages…</p>
+        : confirmed ? (
+          <p className="leadCheckOutcome success" role="status"><Check size={13} /> Site confirmed
+            {contacts.pages.length ? " · " + contacts.emails.length + " email" + (contacts.emails.length === 1 ? "" : "s") + ", " + contacts.phones.length + " phone" + (contacts.phones.length === 1 ? "" : "s") : ""}
+          </p>
+        ) : !failed && !unavailable && result?.contacts?.length ? (
+          <p className="leadCheckOutcome" role="status"><Check size={13} /> Website checked · {contacts.emails.length || contacts.phones.length ? "Published contact details found" : "No published contacts found"}</p>
+        ) : failed || unavailable ? (
+          <p className="leadCheckOutcome warning" role="status"><CircleAlert size={13} />
+            {result?.error || "This website could not be reached. Try again later."}
+          </p>
+        ) : !website && (row.hasWebsite || row.website) ? <p className="leadCheckHint">Check the site to confirm the link and find more contacts.</p>
+        : !website ? <span className="leadCheckHint">No website listed</span> : null}
+    </div>
+  );
+}
+
 function ContactColumn({ values, type, status }) {
   if (!values.length) return <span className="leadMuted">{status}</span>;
   return (
@@ -77,15 +130,17 @@ const countFormat = new Intl.NumberFormat();
 function CatalogPager({ query, hasMore, busy, onPage, placement }) {
   return (
     <nav className="leadCatalogPager" aria-label={placement + " catalog pagination"}>
-      <button type="button" className="btn secondary" disabled={busy || query.page <= 1} onClick={() => onPage(query.page - 1)}>Previous</button>
+      <button type="button" className="btn secondary" disabled={busy || query.page <= 1} onClick={() => onPage(query.page - 1)}><ChevronLeft size={15} /> Previous</button>
       <span>Page {countFormat.format(query.page)}</span>
-      <button type="button" className="btn secondary" disabled={busy || !hasMore} onClick={() => onPage(query.page + 1)}>Next</button>
+      <button type="button" className="btn secondary" disabled={busy || !hasMore} onClick={() => onPage(query.page + 1)}>Next <ChevronRight size={15} /></button>
     </nav>
   );
 }
 
 export default function ProspectResearch({ onSaved }) {
   const { organization } = useAuth();
+  const websiteLabel = useId();
+  const [mode, setMode] = useState("companies");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("NG");
   const [industry, setIndustry] = useState("all");
@@ -103,6 +158,7 @@ export default function ProspectResearch({ onSaved }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [contactsOnly, setContactsOnly] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   const controller = useRef(null);
   const resultTop = useRef(null);
   const scrollAfterPage = useRef(false);
@@ -123,8 +179,10 @@ export default function ProspectResearch({ onSaved }) {
     if (!targets.length) return;
     setPhase("checking");
     setChecking(targets.map(rowKey));
-    const report = (key, result) =>
-      setChecked((current) => ({ ...current, [key]: result }));
+    const report = (key, result) => {
+      if (controller.current === job && !job.signal.aborted)
+        setChecked((current) => ({ ...current, [key]: result }));
+    };
     const remaining = new Set(targets.map(rowKey));
     try {
       await streamEnrichment(
@@ -152,7 +210,7 @@ export default function ProspectResearch({ onSaved }) {
         throw error;
       }
     } finally {
-      setChecking([]);
+      if (controller.current === job) setChecking([]);
     }
   }
 
@@ -163,6 +221,7 @@ export default function ProspectResearch({ onSaved }) {
     setPhase("searching");
     setError("");
     setNotice("");
+    setAttempted(true);
     if (!keepCurrent) {
       setRows([]);
       setCatalogPage(null);
@@ -179,7 +238,7 @@ export default function ProspectResearch({ onSaved }) {
         result.outside
           ? result.companies.length
             ? (result.geminiUsed ? "Expanded your search. " : "") +
-              (result.snapshot ? "Showing additional Overture business websites." : "Showing new matches from public directories.") +
+              (result.snapshot ? "Showing additional business websites." : "Showing new matches from public directories.") +
               (result.partial ? " Some live sources were unavailable." : "")
             : "No additional matches from the available directories. Try another business keyword or location."
           : result.companies.length
@@ -195,6 +254,7 @@ export default function ProspectResearch({ onSaved }) {
       if (controller.current === job) {
         controller.current = null;
         setPhase("");
+        setChecking([]);
       }
     }
   }
@@ -280,6 +340,95 @@ export default function ProspectResearch({ onSaved }) {
     return () => cancelAnimationFrame(frame);
   }, [phase, error, catalogPage?.query.page]);
 
+  function changeMode(next) {
+    if (next === mode) return;
+    controller.current?.abort();
+    controller.current = null;
+    setMode(next);
+    setPhase("");
+    setRows([]);
+    setChecked({});
+    setChecking([]);
+    setCatalogPage(null);
+    setError("");
+    setNotice("");
+    setAttempted(false);
+  }
+
+  async function checkCompanySite(row) {
+    const key = rowKey(row);
+    if (checking.includes(key)) {
+      controller.current?.abort();
+      return;
+    }
+    if (controller.current) return;
+    const job = new AbortController();
+    controller.current = job;
+    setPhase("checking");
+    setChecking([key]);
+    setChecked((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    try {
+      if (row.catalog) {
+        const result = await request("/prospects/verify-catalog-website", { id: row.id }, job.signal);
+        if (!job.signal.aborted) setChecked((current) => ({ ...current, [key]: result }));
+      } else {
+        await enrich([row], job, country);
+      }
+    } catch (error) {
+      if (!job.signal.aborted)
+        setChecked((current) => ({ ...current, [key]: { error: error.message } }));
+    } finally {
+      if (controller.current === job) {
+        if (job.signal.aborted)
+          setChecked((current) => ({ ...current, [key]: { error: "Website check cancelled. You can try again." } }));
+        controller.current = null;
+        setPhase("");
+        setChecking([]);
+      }
+    }
+  }
+
+  async function saveProspect(row) {
+    const key = rowKey(row);
+    if (saving || saved[key]) return;
+    const info = contactInfo(row, checked[key]);
+    setSaving(key);
+    setError("");
+    try {
+      const notes = [
+        row.directory === "OpenStreetMap" &&
+          "© OpenStreetMap contributors · ODbL · https://www.openstreetmap.org/copyright",
+        row.release && [row.directory, row.release, row.id, row.source_url].join(" · "),
+        row.emailEvidence && "Published email source: " + row.emailEvidence,
+        row.phoneEvidence && "Published phone source: " + row.phoneEvidence,
+        row.needsReview && "Business category needs review",
+        info.address && "Address: " + info.address,
+        info.employees && "Employees: " + info.employees,
+        info.linkedin,
+        ...info.pages.map((page) => [page.source, ...page.emails, ...page.phones].join(" · ")),
+        ...[row.email, row.phone].filter(Boolean),
+      ].filter(Boolean).join("\n");
+      await request("/resources/prospects", {
+        name: companyName(row, info),
+        website: displayWebsite(row, checked[key]),
+        industry: row.industry,
+        country: row.country,
+        source_url: row.source_url,
+        notes,
+      });
+      setSaved((current) => ({ ...current, [key]: true }));
+      onSaved();
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setSaving("");
+    }
+  }
+
   const complete = rows.filter((row) => checked[rowKey(row)]).length;
   const withContacts = rows.filter((row) => {
     const info = contactInfo(row, checked[rowKey(row)]);
@@ -289,363 +438,170 @@ export default function ProspectResearch({ onSaved }) {
   const firstMatch = catalogPage ? (catalogPage.query.page - 1) * catalogPage.query.pageSize + 1 : 0;
 
   return (
-    <section
-      className="panel leadWorkbench"
-      aria-labelledby="lead-finder-title"
-    >
-      <div className="leadSearchHeader">
-        <div>
-          <h2 id="lead-finder-title">Find companies and public contacts</h2>
-          <p>
-            Search the Nigerian business catalog by name, location or industry.
-            Verify a business website before opening its link.
-          </p>
-        </div>
-      </div>
-      <form
-        className="researchForm"
-        onSubmit={(event) => {
-          event.preventDefault();
-          searchDirectory({
-            city, country, industry, keyword: country === "NG" ? keyword : "",
-            page: 1, pageSize, contact: country === "NG" ? contact : "any",
-          });
-        }}
-      >
-        <label className="field">
-          <span>City or state</span>
-          <input
-            required={country !== "NG"}
-            minLength={country === "NG" ? undefined : 2}
-            maxLength={75}
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="e.g. Lagos"
-          />
-        </label>
-        <label className="field leadCountry">
-          <span>Country code</span>
-          <input
-            required
-            pattern="[A-Za-z]{2}"
-            maxLength={2}
-            value={country}
-            onChange={(e) => {
-              const code = e.target.value.toUpperCase();
-              setCountry(code);
-              if (code !== "NG" && industry === "all") setIndustry("technology");
-            }}
-          />
-        </label>
-        <label className="field">
-          <span>Industry</span>
-          <select
-            aria-label="Industry"
-            value={industry}
-            onChange={(e) => setIndustry(e.target.value)}
-          >
-            {country === "NG" && <option value="all">All industries</option>}
-            {Object.entries(industries).map(([id, item]) => (
-              <option key={id} value={id}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Company or keyword</span>
-          <input value={keyword} maxLength={100} onChange={(e) => setKeyword(e.target.value)} placeholder="e.g. bakery" />
-        </label>
-        <button className="btn primary" disabled={!!phase}>
-          {phase === "searching" ? "Finding companies…" : "Find companies"}
+    <section className="leadWorkbench" aria-labelledby="lead-finder-title">
+      <div className="discoveryModes" role="group" aria-label="Discovery method">
+        <button type="button" aria-pressed={mode === "companies"} onClick={() => changeMode("companies")}>
+          <Building2 size={19} />
+          <span><strong>Find companies</strong><small>Search by industry and location</small></span>
+          <ArrowRight size={16} />
         </button>
-      </form>
-      <div className="leadBeyondCatalog">
-        <button type="button" className="btn secondary" disabled={!!phase} onClick={searchBeyondCatalog}>
-          Search beyond catalog
+        <button type="button" aria-pressed={mode === "websites"} onClick={() => changeMode("websites")}>
+          <Globe2 size={19} />
+          <span><strong>Search by website</strong><small>Turn a website into business contacts</small></span>
+          <ArrowRight size={16} />
         </button>
-        <p>Enter a location and a business keyword or industry to look in live public directories.</p>
       </div>
-      <details className="leadWebsiteEntry">
-        <summary>Research by website</summary>
-        <form className="researchForm" onSubmit={checkLinks}>
-          <label className="field">
-            <span>Business websites</span>
-            <textarea
-              required
-              maxLength={6200}
-              rows={3}
-              value={websites}
-              onChange={(e) => setWebsites(e.target.value)}
-              placeholder="Enter up to 12 websites, one per line"
-            />
-          </label>
-          <button className="btn secondary" disabled={!!phase}>
-            Check websites
-          </button>
-        </form>
-      </details>
-      {error && (
-        <p className="liveError" role="alert">
-          {error}
-        </p>
-      )}
-      <div ref={resultTop} tabIndex={-1} className="leadResultToolbar leadResultsStart">
-        <p role="status">
-          {catalogPage
-            ? rows.length
-              ? "Showing matches " + countFormat.format(firstMatch) + "–" + countFormat.format(firstMatch + rows.length - 1)
-              : "No catalog matches on this page"
-            : rows.length
-            ? `${rows.length} ${rows.length === 1 ? "company" : "companies"} · ${withContacts.length} with contact details · ${complete} ${complete === 1 ? "website" : "websites"} checked`
-            : notice || (phase ? "Finding matching companies…" : "")}
-        </p>
-        {phase && (
-          <button
-            className="btn secondary"
-            onClick={() => controller.current?.abort()}
-          >
-            Stop research
-          </button>
-        )}
-        {!catalogPage && !!rows.length && (
-          <label>
-            <input
-              type="checkbox"
-              checked={contactsOnly}
-              onChange={(e) => setContactsOnly(e.target.checked)}
-            />{" "}
-            With contact details
-          </label>
+
+      <div className="discoverySearchSurface">
+        <header className="leadSearchHeader">
+          <h2 id="lead-finder-title">{mode === "websites" ? "Research business websites" : "Find your next customer"}</h2>
+          <p>{mode === "websites"
+            ? "Paste a company website to find its published emails, phone numbers and business details."
+            : "Look for companies by name, industry or location."}</p>
+        </header>
+        {mode === "companies" ? (
+          <>
+            <form className="researchForm companyResearchForm" onSubmit={(event) => {
+              event.preventDefault();
+              searchDirectory({
+                city, country, industry, keyword: country === "NG" ? keyword : "",
+                page: 1, pageSize, contact: country === "NG" ? contact : "any",
+              });
+            }}>
+              <label className="field discoveryKeyword">
+                <span>Company or keyword</span>
+                <input value={keyword} maxLength={100} onChange={(event) => setKeyword(event.target.value)} placeholder="Company name, bakery, software…" />
+              </label>
+              <label className="field">
+                <span>Industry</span>
+                <select value={industry} onChange={(event) => setIndustry(event.target.value)}>
+                  {country === "NG" && <option value="all">All industries</option>}
+                  {Object.entries(industries).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span>City or state</span>
+                <input value={city} maxLength={75} minLength={country === "NG" ? undefined : 2}
+                  required={country !== "NG"} onChange={(event) => setCity(event.target.value)} placeholder="e.g. Lagos" />
+              </label>
+              <label className="field leadCountry">
+                <span>Country</span>
+                <input value={country} required pattern="[A-Za-z]{2}" maxLength={2}
+                  onChange={(event) => {
+                    const code = event.target.value.toUpperCase();
+                    setCountry(code);
+                    if (code !== "NG" && industry === "all") setIndustry("technology");
+                  }} />
+              </label>
+              <button className="btn primary" disabled={!!phase}>
+                {phase === "searching" ? <LoaderCircle size={15} className="workspaceSpinner" /> : <Search size={15} />}
+                {phase === "searching" ? "Searching…" : "Find companies"}
+              </button>
+            </form>
+            <div className="leadBeyondCatalog">
+              <button type="button" className="leadInlineAction" disabled={!!phase} onClick={searchBeyondCatalog}>
+                <Sparkles size={14} /> Search beyond catalog
+              </button>
+              <span>Find additional matches in public directories.</span>
+            </div>
+          </>
+        ) : (
+          <form className="websiteResearchForm" onSubmit={checkLinks}>
+            <label className="field">
+              <span id={websiteLabel}>Company websites</span>
+              <textarea aria-labelledby={websiteLabel} required maxLength={6200} rows={3} value={websites}
+                onChange={(event) => setWebsites(event.target.value)}
+                placeholder="company.com, anothercompany.com" />
+            </label>
+            <div className="websiteResearchActions">
+              <p>Up to 12 websites, one per line. Only publicly listed contact details are collected.</p>
+              <button className="btn primary" disabled={!!phase}>
+                {phase ? <LoaderCircle size={15} className="workspaceSpinner" /> : <Globe2 size={15} />}
+                {phase ? "Researching…" : "Research websites"}
+              </button>
+            </div>
+          </form>
         )}
       </div>
-      {catalogPage && (
-        <div className="leadCatalogControls">
-          <label>
-            <span>Results per page</span>
-            <select value={catalogPage.query.pageSize} disabled={!!phase} onChange={(event) => {
-              const size = Number(event.target.value);
-              setPageSize(size);
-              searchDirectory({ ...catalogPage.query, page: 1, pageSize: size }, true);
-            }}>
-              {[20, 50, 100].map((size) => <option value={size} key={size}>{size}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>Contact details</span>
-            <select value={catalogPage.query.contact} disabled={!!phase} onChange={(event) => {
-              const value = event.target.value;
-              setContact(value);
-              searchDirectory({ ...catalogPage.query, page: 1, contact: value }, true);
-            }}>
-              <option value="any">Any contact</option>
-              <option value="email">Has email</option>
-              <option value="phone">Has phone</option>
-              <option value="both">Has email and phone</option>
-            </select>
-          </label>
-          <CatalogPager {...catalogPage} busy={!!phase} onPage={goToPage} placement="Top" />
+
+      {error && <p className="liveError" role="alert">{error}</p>}
+      {!attempted && !rows.length ? (
+        <div className="discoveryWelcome">
+          {mode === "websites" ? <Globe2 size={28} /> : <Search size={28} />}
+          <h3>{mode === "websites" ? "Start with a website. Leave with contacts." : "The right companies are a search away."}</h3>
+          <p>{mode === "websites"
+            ? "Research results appear here as each business website is checked."
+            : "Enter a name or filter by industry and location to build your prospect list."}</p>
         </div>
-      )}
-      {rows.length > 0 && (
+      ) : (
         <>
-          {notice && <p className="leadMuted">{notice}</p>}
+          <div ref={resultTop} tabIndex={-1} className="leadResultToolbar leadResultsStart">
+            <div className="leadResultSummary" role="status">
+              <strong>{catalogPage
+                ? rows.length ? "Matches " + countFormat.format(firstMatch) + "–" + countFormat.format(firstMatch + rows.length - 1) : "No matches on this page"
+                : rows.length ? rows.length + (rows.length === 1 ? " company" : " companies") : phase ? "Looking for companies…" : "No results yet"}
+              </strong>
+              {!catalogPage && !!rows.length && <span>{withContacts.length} with contacts · {complete} websites checked</span>}
+            </div>
+            {phase && <button type="button" className="leadInlineAction" onClick={() => controller.current?.abort()}><X size={14} /> Stop research</button>}
+            {!catalogPage && !!rows.length && (
+              <label className="leadContactsToggle"><input type="checkbox" checked={contactsOnly} onChange={(event) => setContactsOnly(event.target.checked)} /> With contact details</label>
+            )}
+            {catalogPage && (
+              <div className="leadResultFilters">
+                <label><span>Show</span>
+                  <select aria-label="Results per page" value={catalogPage.query.pageSize} disabled={!!phase} onChange={(event) => {
+                    const size = Number(event.target.value);
+                    setPageSize(size);
+                    searchDirectory({ ...catalogPage.query, page: 1, pageSize: size }, true);
+                  }}>
+                    {[20, 50, 100].map((size) => <option value={size} key={size}>{size}</option>)}
+                  </select>
+                </label>
+                <label><span>Contacts</span>
+                  <select aria-label="Contact details" value={catalogPage.query.contact} disabled={!!phase} onChange={(event) => {
+                    const value = event.target.value;
+                    setContact(value);
+                    searchDirectory({ ...catalogPage.query, page: 1, contact: value }, true);
+                  }}>
+                    <option value="any">Any contact</option><option value="email">Has email</option>
+                    <option value="phone">Has phone</option><option value="both">Email and phone</option>
+                  </select>
+                </label>
+                <CatalogPager {...catalogPage} busy={!!phase} onPage={goToPage} placement="Top" />
+              </div>
+            )}
+          </div>
+          {notice && <p className="discoveryNotice">{notice}</p>}
           {shown.length ? (
-            <div
-              className="tableScroll leadTableScroll"
-              role="region"
-              aria-label="Lead results"
-              tabIndex={0}
-            >
+            <div className="tableScroll leadTableScroll" role="region" aria-label="Lead results" tabIndex={0}>
               <table className="leadTable">
-                <thead>
-                  <tr>
-                    <th scope="col">Company</th>
-                    <th scope="col">Business email</th>
-                    <th scope="col">Phone</th>
-                    <th scope="col">Company details</th>
-                    <th scope="col">Action</th>
-                  </tr>
-                </thead>
+                <thead><tr><th scope="col">Company</th><th scope="col">Email</th><th scope="col">Phone</th><th scope="col"><span className="screenReaderOnly">Save prospect</span></th></tr></thead>
                 <tbody>
                   {shown.map((row) => {
                     const key = rowKey(row);
                     const result = checked[key];
                     const info = contactInfo(row, result);
-                    const displayWebsite = result?.websiteStatus === "verified" ? result.website : row.websiteStatus === "verified" || (!row.directory && !row.catalog) ? row.website : null;
-                    const waiting = checking.includes(key) && !result;
-                    const status = waiting
-                      ? "Checking…"
-                      : result?.error
-                        ? "Unavailable"
-                        : result
-                          ? "Not published"
-                          : row.catalog
-                            ? "Not listed"
-                          : row.website
-                            ? "Not checked"
-                            : "No website";
+                    const waiting = checking.includes(key);
+                    const emptyContact = waiting ? "Checking…" : result ? "Not published" : "Not listed";
                     return (
                       <tr key={key}>
-                        <td>
-                          <strong>
-                            {info.pages.find((page) => page.details?.name)
-                              ?.details.name || row.name}
-                          </strong>
-                          {!displayWebsite && (row.hasWebsite || row.website) && <small className="leadWebsiteStatus">{result?.websiteStatus === "unavailable" || row.websiteStatus === "unavailable" ? "Website unavailable" : "Website needs verification"}</small>}
-                          {displayWebsite && (
-                            <a
-                              className="leadWebsite"
-                              href={displayWebsite}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {new URL(displayWebsite).hostname}
-                            </a>
-                          )}
-
+                        <td className="leadCompany">
+                          <strong className="leadCompanyName">{companyName(row, info)}</strong>
+                          <p className="leadCompanyMeta">{[row.industry, row.city || row.region, row.country].filter(Boolean).join(" · ") || "Website research"}</p>
+                          <SiteCheck row={row} result={result} busy={waiting} disabled={!!phase} onCheck={() => checkCompanySite(row)} />
+                          {info.address && <p className="leadAddress" title={info.address}>{info.address}</p>}
+                          {row.needsReview && <small className="leadMuted">Business category needs review</small>}
                         </td>
-                        <td data-label="Business email">
-                          <ContactColumn
-                            type="mailto"
-                            values={info.emails}
-                            status={status}
-                          />
-                        </td>
-                        <td data-label="Phone">
-                          <ContactColumn
-                            type="tel"
-                            values={info.phones}
-                            status={status}
-                          />
-                        </td>
-                        <td data-label="Company details">
-                          <div className="leadCompanyFacts">
-                            <span>
-                              {[row.industry, row.city, row.region, row.country]
-                                .filter(Boolean)
-                                .join(" · ") || "Website research"}
-                            </span>
-                            {row.needsReview && <span className="leadMuted">Business category needs review</span>}
-                            {info.address && <span>{info.address}</span>}
-                            {info.employees && (
-                              <span>{info.employees} employees</span>
-                            )}
-                            {info.linkedin && (
-                              <a
-                                href={info.linkedin}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                LinkedIn company page
-                              </a>
-                            )}
-                            {result?.error && (
-                              <span className="leadMuted">{result.error}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="leadActions">
-                            {(row.website || row.hasWebsite) &&
-                              (!result || result.error) &&
-                              !phase && (
-                                <button
-                                  className="btn secondary"
-                                  onClick={async () => {
-                                    if (controller.current) return;
-                                    const job = new AbortController();
-                                    controller.current = job;
-                                    setError("");
-                                    setChecked((current) => {
-                                      const next = { ...current };
-                                      delete next[key];
-                                      return next;
-                                    });
-                                    try {
-                                      if (row.catalog) {
-                                        setPhase("checking");
-                                        setChecking([key]);
-                                        const check = await request("/prospects/verify-catalog-website", { id: row.id }, job.signal);
-                                        setChecked((current) => ({ ...current, [key]: check }));
-                                      } else {
-                                        await enrich([row], job, country);
-                                      }
-                                    } catch (error) {
-                                      if (!job.signal.aborted)
-                                        setError(error.message);
-                                    } finally {
-                                      if (controller.current === job) {
-                                        controller.current = null;
-                                        setPhase("");
-                                        setChecking([]);
-                                      }
-                                    }
-                                  }}
-                                >
-                                  Verify website
-                                </button>
-                              )}
-                            <button
-                              className="btn secondary"
-                              disabled={waiting || !!saving || !!saved[key]}
-                              onClick={async () => {
-                                setSaving(key);
-                                setError("");
-                                try {
-                                  const notes = [
-                                    row.directory === "OpenStreetMap" &&
-                                      "© OpenStreetMap contributors · ODbL · https://www.openstreetmap.org/copyright",
-                                    row.release &&
-                                      [row.directory, row.release, row.id, row.source_url].join(" · "),
-                                    row.emailEvidence && "Published email source: " + row.emailEvidence,
-                                    row.phoneEvidence && "Published phone source: " + row.phoneEvidence,
-                                    row.needsReview && "Business category needs review",
-                                    info.address && "Address: " + info.address,
-                                    info.employees &&
-                                      "Employees: " + info.employees,
-                                    info.linkedin,
-                                    ...info.pages.map((page) =>
-                                      [
-                                        page.source,
-                                        ...page.emails,
-                                        ...page.phones,
-                                      ].join(" · "),
-                                    ),
-                                    ...[row.email, row.phone].filter(Boolean),
-                                  ]
-                                    .filter(Boolean)
-                                    .join("\n");
-                                  await request("/resources/prospects", {
-                                    name:
-                                      info.pages.find(
-                                        (page) => page.details?.name,
-                                      )?.details.name || row.name,
-                                    website: displayWebsite,
-                                    industry: row.industry,
-                                    country: row.country,
-                                    source_url: row.source_url,
-                                    notes,
-                                  });
-                                  setSaved((current) => ({
-                                    ...current,
-                                    [key]: true,
-                                  }));
-                                  onSaved();
-                                } catch (error) {
-                                  setError(error.message);
-                                } finally {
-                                  setSaving("");
-                                }
-                              }}
-                            >
-                              {saved[key]
-                                ? "Saved"
-                                : saving === key
-                                  ? "Saving…"
-                                  : "Save prospect"}
-                            </button>
-                          </div>
+                        <td data-label="Email"><ContactColumn values={info.emails} type="mailto" status={emptyContact} /></td>
+                        <td data-label="Phone"><ContactColumn values={info.phones} type="tel" status={emptyContact} /></td>
+                        <td className="leadSaveCell">
+                          <button type="button" className={"leadSaveButton" + (saved[key] ? " saved" : "")}
+                            aria-label={(saved[key] ? "Saved " : "Save prospect ") + row.name}
+                            disabled={waiting || !!saving || !!saved[key]} onClick={() => saveProspect(row)}>
+                            {saved[key] ? <Check size={15} /> : saving === key ? <LoaderCircle size={15} className="workspaceSpinner" /> : <BookmarkPlus size={15} />}
+                            {saved[key] ? "Saved" : saving === key ? "Saving…" : "Save"}
+                          </button>
                         </td>
                       </tr>
                     );
@@ -653,15 +609,9 @@ export default function ProspectResearch({ onSaved }) {
                 </tbody>
               </table>
             </div>
-          ) : (
-            <p className="leadEmpty">
-              No results with public email or phone details yet.
-            </p>
-          )}
-          {catalogPage && (
-            <CatalogPager {...catalogPage} busy={!!phase} onPage={goToPage} placement="Bottom" />
-          )}
-          <p className="leadCredit"><Link to="/data-sources">Data licenses and terms</Link></p>
+          ) : !phase ? <p className="leadEmpty">No matching contacts. Try another search or research a company website.</p> : null}
+          {catalogPage && <CatalogPager {...catalogPage} busy={!!phase} onPage={goToPage} placement="Bottom" />}
+          {!!rows.length && <p className="leadCredit"><Link to="/data-sources">Data licenses and terms</Link></p>}
         </>
       )}
     </section>

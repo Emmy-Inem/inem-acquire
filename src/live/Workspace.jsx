@@ -45,9 +45,10 @@ import { AnimatedPreview } from "../PlatformMotion";
 import WorkspaceSearch from "./WorkspaceSearch";
 import AccountSettings from "./AccountSettings";
 import WorkspaceGuide from "./WorkspaceGuide";
-import ProspectResearch from "./ProspectResearch";
 import { toLocalDateTime } from "./dateTime";
 import { assignableRoles, canManageMember } from "../../shared/permissions";
+
+const ProspectResearch = React.lazy(() => import("./ProspectResearch"));
 
 const navigation = [
   [
@@ -630,7 +631,7 @@ function RecordForm({ resource, record, onClose, onSaved }) {
       >
         <header>
           <h2 id="record-form-title">
-            {record ? "Edit" : "Add"} {config.title.toLowerCase()}
+            {record ? "Edit" : "Add"} {resource === "icps" ? "ideal customer profile" : resource.slice(0, -1)}
           </h2>
           <button
             aria-label="Close dialog"
@@ -930,7 +931,9 @@ function ResourcePage({ resource, write, approve }) {
             </button>
           </div>
           <div hidden={showRecords}>
-            <ProspectResearch onSaved={load} />
+            <React.Suspense fallback={<p className="liveState" role="status">Opening Discovery…</p>}>
+              <ProspectResearch onSaved={load} />
+            </React.Suspense>
           </div>
         </>
       )}
@@ -971,16 +974,16 @@ function ResourcePage({ resource, write, approve }) {
                 : false
             }
           >
-            <p className="tableHint">
+            <p className="tableHint resourceTableHint">
               Swipe across to see all details and actions.
             </p>
             <div
-              className="tableScroll"
+              className="tableScroll resourceTableScroll"
               role="region"
               aria-label={config.title + " records"}
               tabIndex={0}
             >
-              <table>
+              <table className="resourceTable">
                 <thead>
                   <tr>
                     {config.columns.map((c) => (
@@ -993,9 +996,9 @@ function ResourcePage({ resource, write, approve }) {
                   {rows.map((row) => (
                     <tr key={row.id}>
                       {config.columns.map((column) => (
-                        <td key={column}>{display(row[column], column)}</td>
+                        <td key={column} data-label={titleCase(column)}>{display(row[column], column)}</td>
                       ))}
-                      <td>
+                      <td className="resourceActionCell">
                         <div className="liveRowActions">
                           {write && (
                             <button onClick={() => setEditing(row)}>
@@ -1049,7 +1052,7 @@ function ResourcePage({ resource, write, approve }) {
             </div>
           </State>
           <div className="pagination">
-            <span>{count} records</span>
+            <span>{count} {count === 1 ? "record" : "records"}</span>
             <div>
               <button
                 disabled={!offset || loading}

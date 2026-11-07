@@ -1,3 +1,4 @@
+import { searchCatalog } from "../server/discovery-catalog.js";
 import { websiteIdentity } from "../server/website-identity.js";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -175,4 +176,27 @@ test("website identity rejects parked domains and mismatched business pages", ()
   assert.equal(websiteIdentity("<title>New Dawn Properties</title><p>This domain is for sale</p>", "New Dawn Properties").status, "unavailable");
   assert.equal(websiteIdentity('<title>Homepage</title><script type="application/ld+json">{"@type":"Person","name":"New Dawn Properties"}</script>', "New Dawn Properties").status, "needs_review");
   assert.equal(websiteIdentity("<title>Our services</title><h1>International Group</h1>", "International Group").status, "needs_review");
+});
+
+
+test("catalog reveals a display host while withholding unverified or stale website links", async () => {
+  const rows = [
+    { overture_place_id: "unknown", name: "Unreviewed", website: "https://www.example.com/contact", website_status: "unreviewed" },
+    { overture_place_id: "confirmed", name: "Confirmed", website: "https://example.org/", website_status: "verified", website_checked_at: new Date().toISOString() },
+    { overture_place_id: "stale", name: "Stale", website: "https://example.net/", website_status: "verified", website_checked_at: "2020-01-01T00:00:00Z" },
+    { overture_place_id: "unsafe", name: "Unsafe", website: "javascript:alert(1)", website_status: "unreviewed" },
+  ];
+  const query = {};
+  for (const method of ["select", "eq", "order", "range"]) query[method] = () => query;
+  query.then = resolve => Promise.resolve({data: rows, error: null}).then(resolve);
+  const result = await searchCatalog({from: () => query}, {country: "NG", industry: "all", page: 1, pageSize: 20});
+  const [unknown, confirmed, stale, unsafe] = result.companies;
+  assert.equal(unknown.websiteHost, "example.com");
+  assert.equal(unknown.website, null);
+  assert.equal(confirmed.website, "https://example.org/");
+  assert.equal(stale.website, null);
+  assert.equal(stale.websiteStatus, "unreviewed");
+  assert.equal(unsafe.websiteHost, null);
+  assert.equal(unsafe.hasWebsite, false);
+  assert.equal("total" in result, false);
 });
