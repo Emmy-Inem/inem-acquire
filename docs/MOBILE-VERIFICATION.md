@@ -18,5 +18,6 @@
 - Additional landing breakpoints at 820, 1024 and 1440 pixels: navigation switches correctly and content stays within the page.
 - `npm run test:browser` covers real login, record persistence, roles, public menu blur, touch-highlight suppression, menu focus restoration, workflow switching, workspace navigation, mobile record editing and reduced motion.
 - `npm test` and `npm run build` pass.
+- `node tests/mobile-build.js` checks the built preview (port 5174 by default, or `MOBILE_CHECK_URL`) at 320, 390, 768 and 820 pixels. It verifies that both standard and Safari blur declarations survive CSS minification, menus close correctly and mobile form text remains 16px.
 
 Browser checks use installed Chrome with touch/mobile emulation and disposable Supabase fixtures. These checks do not replace testing on physical iOS/Safari and Android devices. Evidence is kept in ignored `work/qa-mobile` and `work/qa-backend` folders.
