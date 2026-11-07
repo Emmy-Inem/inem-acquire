@@ -73,7 +73,7 @@ async function search(env, db, { city, country, industry, keyword }) {
       { city, country, industry: sector, keyword },
       { limit: 50 },
     ).then((result) => {
-      if (!result.available) throw new Error("Web search unavailable");
+      if (!result.available) throw Object.assign(new Error("Web search unavailable"), {code:result.reason});
       return result.candidates;
     }),
   ]);
@@ -126,6 +126,8 @@ async function search(env, db, { city, country, industry, keyword }) {
     partial,
     snapshot,
     target: 50,
+    webSearchAvailable: sources[2].status === "fulfilled",
+    webSearchReason: sources[2].status === "rejected" ? sources[2].reason?.code || "unavailable" : null,
     availability:
       companies.length < 50
         ? "Fewer than 50 additional businesses matched the available public sources. Try a broader area or industry."

@@ -2,7 +2,7 @@ import { webUrl } from "./lead-discovery.js";
 
 // Public business research only; no tenant records, private documents or credentials.
 export async function groundedBusinessSearch(env, query, { limit = 50 } = {}) {
-  if (!env.GEMINI_API_KEY) return { candidates: [], available: false };
+  if (!env.GEMINI_API_KEY) return { candidates: [], available: false, reason:"not_configured" };
   const model = env.GEMINI_SEARCH_MODEL || "gemini-2.5-flash";
   if (!/^[a-z0-9][a-z0-9.-]{0,79}$/.test(model))
     return { candidates: [], available: false };
@@ -36,11 +36,11 @@ export async function groundedBusinessSearch(env, query, { limit = 50 } = {}) {
         }),
       },
     );
-    if (!response.ok) return { candidates: [], available: false };
+    if (!response.ok) return { candidates: [], available: false, reason:"provider_"+response.status };
     const data = await response.json(),
       candidate = data.candidates?.[0];
     if (!candidate?.groundingMetadata?.groundingChunks?.length)
-      return { candidates: [], available: false };
+      return { candidates: [], available: false, reason:"no_search_evidence" };
     const text =
       candidate.content?.parts
         ?.filter((p) => !p.thought)
@@ -81,7 +81,7 @@ export async function groundedBusinessSearch(env, query, { limit = 50 } = {}) {
       })
       .slice(0, Math.min(limit, 50));
     return { candidates: rows, available: true };
-  } catch {
-    return { candidates: [], available: false };
+  } catch (error) {
+    return { candidates: [], available: false, reason:error.name === "SyntaxError" ? "incomplete_response" : "timeout_or_unavailable" };
   }
 }
