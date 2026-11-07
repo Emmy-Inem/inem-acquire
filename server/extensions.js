@@ -1,3 +1,4 @@
+import { searchCatalog } from "./discovery-catalog.js";
 import express from "express";
 import Stripe from "stripe";
 import { Webhook } from "svix";
@@ -317,21 +318,26 @@ export function extensionRoutes(
     wrap(async (req, res) => {
       const query = z
         .object({
-          city: z
-            .string()
-            .trim()
-            .min(2)
-            .max(75)
-            .regex(/^[\p{L}\p{M}\d .,'’()-]+$/u),
-          country: z
-            .string()
-            .trim()
-            .toUpperCase()
-            .regex(/^[A-Z]{2}$/),
-          industry: z.enum(Object.keys(industries)),
+          city: z.string().trim().max(75).default(""),
+          country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
+          industry: z.enum(["all", ...Object.keys(industries)]),
+          keyword: z.string().trim().max(100).default(""),
+          page: z.number().int().min(1).max(250).default(1),
         })
         .strict()
         .parse(req.body);
+      if ([query.city, query.keyword].some(
+        (value) => value && !/^[\p{L}\p{M}\d .,&'’()-]+$/u.test(value),
+      ))
+        return res.status(400).json({ error: "Enter a valid location or business keyword." });
+
+      if (query.country === "NG") {
+        const result = await searchCatalog(admin(), query);
+        if (result.companies.length || query.page > 1 || query.keyword ||
+            !query.city || query.industry === "all") return res.json(result);
+      }
+      if (query.city.length < 2 || query.industry === "all" || query.keyword || query.page !== 1)
+        return res.status(400).json({ error: "For searches outside Nigeria, enter a city and choose an industry." });
       res.json(await findBusinesses(env, query));
     }),
   );

@@ -4,7 +4,8 @@ export class HttpError extends Error{constructor(public status:number,message:st
 export async function context(req:Request){
  const jwt=req.headers.get('authorization')?.replace(/^Bearer\s+/i,'');if(!jwt)throw new HttpError(401,'Sign in required');
  const url=Deno.env.get('SUPABASE_URL')!,key=Deno.env.get('SUPABASE_ANON_KEY')!;
- const db=createClient(url,key,{global:{headers:{Authorization:`Bearer ${jwt}`}},auth:{persistSession:false}});
+ const supportId=req.headers.get('x-support-session-id');
+ const db=createClient(url,key,{global:{headers:{Authorization:`Bearer ${jwt}`,...(supportId?{'x-support-session-id':supportId}:{})}},auth:{persistSession:false}});
  const {data:{user},error}=await db.auth.getUser(jwt);if(error||!user)throw new HttpError(401,'Session expired');
  const admin=createClient(url,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false}});
  return {db,admin,user};

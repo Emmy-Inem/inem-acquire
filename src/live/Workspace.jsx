@@ -243,8 +243,12 @@ function useOrgApi() {
   const { organization } = useAuth();
   return useCallback(
     (path, options = {}) =>
-      api(path, { ...options, organizationId: organization?.id }),
-    [organization?.id],
+      api(path, {
+        ...options,
+        organizationId: organization?.id,
+        supportSessionId: organization?.support?.id,
+      }),
+    [organization?.id, organization?.support?.id],
   );
 }
 function State({ loading, error, retry, empty, children }) {
@@ -278,6 +282,7 @@ export function LiveWorkspace() {
     organization,
     organizations,
     selectOrganization,
+    workspaceBase,
     logout,
     refresh,
   } = useAuth();
@@ -295,12 +300,16 @@ export function LiveWorkspace() {
     setMobile(false);
   }, [section, compact]);
   const role = organization?.role;
-  const write = role === "platform_support" || canRole(role, "write"),
-    approve = role === "platform_support" || canRole(role, "approve"),
-    manage = role === "platform_support" || canRole(role, "manage");
-  if (!organization && section !== "admin")
+  const support = organization?.support;
+  const write = !!support || canRole(role, "write"),
+    approve = canRole(role, "approve"),
+    manage = canRole(role, "manage");
+  if (section === "admin") return <Navigate to="/platform" replace />;
+  if (support && ["settings", "team", "integrations", "billing", "audit"].includes(section))
+    return <Navigate to={workspaceBase + "/dashboard"} replace />;
+  if (!organization)
     return session.platformOwner ? (
-      <Navigate to="/app/admin" replace />
+      <Navigate to="/platform" replace />
     ) : (
       <Navigate to="/onboarding/welcome" replace />
     );
@@ -331,6 +340,10 @@ export function LiveWorkspace() {
             <X />
           </button>
         </div>
+        {support ? (
+          <div className="workspace liveWorkspaceSelect"><Building2 size={20} /><strong>{organization.name}</strong></div>
+        ) : (
+        <>
         <label className="workspace liveWorkspaceSelect">
           <Building2 size={20} />
           <select
@@ -353,6 +366,8 @@ export function LiveWorkspace() {
           <Plus size={16} />
           Create organization
         </Link>
+        </>
+        )}
         <nav>
           {navigation.map(([group, items]) => (
             <div className="navGroup" key={group}>
@@ -360,7 +375,7 @@ export function LiveWorkspace() {
               {items.map(([label, path, Icon]) => (
                 <NavLink
                   key={path}
-                  to={"/app/" + path}
+                  to={workspaceBase + "/" + path}
                   onClick={() => setMobile(false)}
                 >
                   <Icon />
@@ -377,6 +392,7 @@ export function LiveWorkspace() {
                 Audit trail
               </NavLink>
             )}
+            {!support && <>
             <NavLink to="/app/team">
               <Users />
               Team & roles
@@ -389,28 +405,29 @@ export function LiveWorkspace() {
               <BriefcaseBusiness />
               Billing
             </NavLink>
-            <NavLink to="/app/guide">
+            </>}
+            <NavLink to={workspaceBase + "/guide"}>
               <Lightbulb />
               Workspace guide
             </NavLink>
             {session.platformOwner && (
-              <NavLink to="/app/admin">
+              <NavLink to="/platform">
                 <ShieldCheck />
-                Platform owner
+                Platform console
               </NavLink>
             )}
           </div>
         </nav>
         <div className="sideBottom">
-          <NavLink to="/app/settings">
+          {!support && <NavLink to="/app/settings">
             <Settings /> Settings
-          </NavLink>
+          </NavLink>}
           <div className="userChip">
             <span className="avatar">{initials}</span>
             <span>
               <b>{session.profile.full_name || session.user.email}</b>
               <small>
-                {session.platformOwner ? "Platform owner" : titleCase(role)}
+                {support ? "Support access" : "Organization " + titleCase(role)}
               </small>
             </span>
             <button
@@ -439,17 +456,17 @@ export function LiveWorkspace() {
           </button>
           <WorkspaceSearch />
           <div className="workspaceTopActions">
-            <Link className="workspaceHelp" to="/app/guide">
+            <Link className="workspaceHelp" to={workspaceBase + "/guide"}>
               <Lightbulb size={18} />
               <span>Guide</span>
             </Link>
-            <Link
+            {!support && <Link
               className="workspaceAccount"
               to="/app/settings"
               aria-label="Your account and settings"
             >
               <span className="avatar">{initials}</span>
-            </Link>
+            </Link>}
           </div>
         </header>
         {shellError && (
@@ -461,9 +478,9 @@ export function LiveWorkspace() {
           <div className="supportBanner" role="status">
             <ShieldCheck size={17} />
             <span>
-              Support access · {organization.name} · expires{" "}
+              Support workspace · {organization.name} · expires{" "}
               {new Date(organization.support.expires_at).toLocaleTimeString()}
-              <small>{organization.support.reason}</small>
+              <small>{organization.support.reason} · Organization administration and approvals are restricted.</small>
             </span>
             <button
               disabled={endingSupport}
@@ -476,7 +493,7 @@ export function LiveWorkspace() {
                     body: {},
                   });
                   await refresh();
-                  navigate("/app/admin");
+                  navigate("/platform");
                 } catch (e) {
                   setShellError(e.message);
                 } finally {
@@ -515,8 +532,6 @@ export function LiveWorkspace() {
             <AuditView />
           ) : section === "team" ? (
             <TeamPage {...props} />
-          ) : section === "admin" ? (
-            <PlatformPage />
           ) : section === "integrations" || section === "billing" ? (
             <ConnectionsPage section={section} {...props} />
           ) : section === "inbox" ? (
@@ -531,7 +546,7 @@ export function LiveWorkspace() {
           ) : (
             <div className="liveState">
               <h1>Page not found</h1>
-              <Link to="/app/dashboard">Return to overview</Link>
+              <Link to={workspaceBase + "/dashboard"}>Return to overview</Link>
             </div>
           )}
         </main>
@@ -848,7 +863,10 @@ function ResourcePage({ resource, write, approve }) {
     try {
       const response = await fetch("/api/export/" + resource, {
         credentials: "same-origin",
-        headers: { "x-organization-id": organization.id },
+        headers: {
+          "x-organization-id": organization.id,
+          ...(organization.support ? { "x-support-session-id": organization.support.id } : {}),
+        },
       });
       if (!response.ok) {
         const data = await response.json();
@@ -1399,6 +1417,7 @@ function CsvImport({ onImported }) {
   );
 }
 function Overview({ analytics, write }) {
+  const { workspaceBase } = useAuth();
   const request = useOrgApi();
   const [data, setData] = useState(null),
     [error, setError] = useState("");
@@ -1430,7 +1449,7 @@ function Overview({ analytics, write }) {
         title={analytics ? "Sales analytics" : "Your acquisition overview"}
         description="Your organization’s actual records, with the next actions in view."
       >
-        <Link className="btn primary" to="/app/ai-advisor">
+        <Link className="btn primary" to={workspaceBase + "/ai-advisor"}>
           <Lightbulb size={16} />
           Ask advisor
         </Link>
@@ -1487,7 +1506,7 @@ function Overview({ analytics, write }) {
                 </small>
               </div>
             ))}
-            <Link to="/app/pipeline">
+            <Link to={workspaceBase + "/pipeline"}>
               View pipeline <ArrowRight size={14} />
             </Link>
           </article>
@@ -1534,7 +1553,7 @@ function Overview({ analytics, write }) {
                   </div>
                 ))
             )}
-            <Link to="/app/tasks">
+            <Link to={workspaceBase + "/tasks"}>
               Manage tasks <ArrowRight size={14} />
             </Link>
           </article>
@@ -1547,6 +1566,7 @@ function Overview({ analytics, write }) {
   );
 }
 function PipelinePage({ write }) {
+  const { workspaceBase } = useAuth();
   const request = useOrgApi(),
     [rows, setRows] = useState(null),
     [error, setError] = useState("");
@@ -1569,7 +1589,7 @@ function PipelinePage({ write }) {
         title="Pipeline"
         description="Move opportunities forward while keeping their value and next action visible."
       >
-        <Link className="btn primary" to="/app/deals">
+        <Link className="btn primary" to={workspaceBase + "/deals"}>
           <Plus size={16} />
           Manage deals
         </Link>
@@ -1645,6 +1665,7 @@ function PipelinePage({ write }) {
   );
 }
 function DiagnosisPage({ write }) {
+  const { workspaceBase } = useAuth();
   const request = useOrgApi(),
     [rows, setRows] = useState(null),
     [pending, setPending] = useState(false),
@@ -1731,7 +1752,7 @@ function DiagnosisPage({ write }) {
                   <p>{f.detail}</p>
                   <Link
                     to={
-                      "/app/" +
+                      workspaceBase + "/" +
                       (f.source === "icps" ? "ideal-customers" : f.source)
                     }
                   >
@@ -1982,8 +2003,42 @@ function TeamPage({ manage }) {
     </>
   );
 }
+export function PlatformConsole() {
+  const { session, organization, logout } = useAuth();
+  const navigate = useNavigate();
+  const [error, setError] = useState("");
+
+  if (!session.platformOwner)
+    return (
+      <main className="liveState">
+        <ShieldCheck />
+        <h1>Platform owner access required</h1>
+        <p>Platform administration is reserved for platform owners.</p>
+        <Link className="btn secondary" to={organization ? "/app/dashboard" : "/onboarding/welcome"}>Return to your workspace</Link>
+      </main>
+    );
+
+  return (
+    <div className="platformConsole">
+      <header className="platformConsoleBar">
+        <LiveBrand />
+        <div className="platformConsoleActions">
+          {organization && <Link className="btn secondary" to="/app/dashboard">My workspace</Link>}
+          <button className="btn secondary" onClick={() => logout().then(() => navigate("/login")).catch((e) => setError(e.message))}>
+            <LogOut size={17} /> Sign out
+          </button>
+        </div>
+      </header>
+      <main className="appMain platformConsoleMain">
+        {error && <p className="liveError" role="alert">{error}</p>}
+        <PlatformPage />
+      </main>
+    </div>
+  );
+}
+
 function PlatformPage() {
-  const { session, refresh, selectOrganization } = useAuth(),
+  const { session, refresh, organizations, selectOrganization } = useAuth(),
     navigate = useNavigate();
   const [rows, setRows] = useState(null),
     [error, setError] = useState(""),
@@ -2004,22 +2059,12 @@ function PlatformPage() {
     [],
   );
   useEffect(() => {
-    if (session.platformOwner) load();
-  }, [session.platformOwner, load]);
-  if (!session.platformOwner)
-    return (
-      <div className="liveState">
-        <ShieldCheck />
-        <h1>Platform owner access required</h1>
-        <p>
-          Your organization role does not grant access to other organizations.
-        </p>
-      </div>
-    );
+    load();
+  }, [load]);
   return (
     <>
       <Header
-        title="Platform owner"
+        title="Platform console"
         description="Manage the platform and help organizations through time-limited, audited support sessions."
       />
       <State
@@ -2033,12 +2078,24 @@ function PlatformPage() {
         }
       >
         <section className="panel livePanel">
-          {rows?.map((o) => (
+          {rows?.map((o) => {
+            const member = organizations.find((org) => org.id === o.id);
+            const support = session.supportSessions?.find((item) => item.organization_id === o.id && Date.parse(item.expires_at) > Date.now());
+            return (
             <div className="liveMetric" key={o.id}>
               <span>
                 <b>{o.name}</b>
                 <small>{o.industry || "Industry not set"}</small>
               </span>
+              {member ? (
+                <Link className="btn secondary" to="/app/dashboard" onClick={() => selectOrganization(o.id)}>
+                  Open workspace <ArrowRight size={15} />
+                </Link>
+              ) : support ? (
+                <Link className="btn secondary" to={"/support/" + o.id + "/dashboard"}>
+                  Resume support <ArrowRight size={15} />
+                </Link>
+              ) : (
               <button
                 className="btn secondary"
                 onClick={() => {
@@ -2046,10 +2103,12 @@ function PlatformPage() {
                   setReason("");
                 }}
               >
-                Manage organization <ArrowRight size={15} />
+                Start support <ArrowRight size={15} />
               </button>
+              )}
             </div>
-          ))}
+            );
+          })}
         </section>
       </State>
       <PlatformRequests />
@@ -2076,8 +2135,7 @@ function PlatformPage() {
               </button>
             </header>
             <p>
-              This gives you access for one hour. The reason and your changes
-              are recorded in the organization’s audit trail.
+              This opens a separate support workspace for one hour. You can help with everyday records. Organization administration, approvals and billing require membership permissions. Your reason and changes are recorded in the organization’s audit trail.
             </p>
             <form
               onSubmit={async (e) => {
@@ -2090,8 +2148,7 @@ function PlatformPage() {
                     body: { organization_id: selected.id, reason },
                   });
                   await refresh();
-                  selectOrganization(selected.id);
-                  navigate("/app/dashboard");
+                  navigate("/support/" + selected.id + "/dashboard");
                 } catch (e) {
                   setError(e.message);
                   setSelected(null);
@@ -2292,6 +2349,7 @@ function InboxView() {
   );
 }
 function AdvisorPage() {
+  const { workspaceBase } = useAuth();
   const request = useOrgApi(),
     [question, setQuestion] = useState(""),
     [answer, setAnswer] = useState(null),
@@ -2359,7 +2417,7 @@ function AdvisorPage() {
               <Link
                 key={i}
                 to={
-                  "/app/" + (s.table === "icps" ? "ideal-customers" : s.table)
+                  workspaceBase + "/" + (s.table === "icps" ? "ideal-customers" : s.table)
                 }
               >
                 {titleCase(s.table)} · {s.ids.length} linked records
@@ -2411,6 +2469,7 @@ function DocumentPanel({ manage }) {
                     credentials: "same-origin",
                     headers: {
                       "x-organization-id": organization.id,
+                      ...(organization.support ? { "x-support-session-id": organization.support.id } : {}),
                       "Content-Type": file.type || "text/plain",
                     },
                     body: file,

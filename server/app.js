@@ -28,7 +28,7 @@ export function createApp({
     access: production ? "__Host-ac-access" : "ac-access",
     refresh: production ? "__Host-ac-refresh" : "ac-refresh",
   };
-  const makeClient = (jwt) =>
+  const makeClient = (jwt, supportId) =>
     clientFactory(url, key, {
       auth: {
         persistSession: false,
@@ -36,7 +36,14 @@ export function createApp({
         detectSessionInUrl: false,
       },
       ...(jwt
-        ? { global: { headers: { Authorization: `Bearer ${jwt}` } } }
+        ? {
+            global: {
+              headers: {
+                Authorization: `Bearer ${jwt}`,
+                ...(supportId ? { "x-support-session-id": supportId } : {}),
+              },
+            },
+          }
         : {}),
     });
   const admin = () => {
@@ -358,6 +365,9 @@ export function createApp({
   const organization = (capability) =>
     wrap(async (req, res, next) => {
       const org = uuid.parse(req.headers["x-organization-id"]);
+      const supportId = uuid.optional().parse(req.headers["x-support-session-id"]);
+      if (supportId) req.db = makeClient(req.jwt, supportId);
+      req.supportId = supportId;
       const permissions = result(
         await req.db.rpc("organization_permissions", { org }),
       );
@@ -374,6 +384,7 @@ export function createApp({
       method: "POST",
       headers: {
         Authorization: `Bearer ${req.jwt}`,
+        ...(req.supportId ? { "x-support-session-id": req.supportId } : {}),
         apikey: key,
         "Content-Type": "application/json",
       },
@@ -398,7 +409,7 @@ export function createApp({
     "/api/bootstrap",
     auth,
     wrap(async (req, res) => {
-      const [profile, memberships, roles, support] = await Promise.all([
+      const [profile, memberships, roles] = await Promise.all([
         req.db
           .from("profiles")
           .select("id,full_name")
@@ -409,19 +420,22 @@ export function createApp({
           .select("organization_id,role,organizations(*)")
           .eq("user_id", req.user.id),
         req.db.from("platform_roles").select("role").eq("user_id", req.user.id),
-        req.db
-          .from("support_sessions")
-          .select("organization_id,expires_at,reason,organizations(*)")
-          .eq("user_id", req.user.id)
-          .is("ended_at", null)
-          .gt("expires_at", new Date().toISOString()),
       ]);
+      const platformOwner = result(roles).some((r) => r.role === "platform_owner");
+      const supportSessions = platformOwner
+        ? result(await admin()
+            .from("support_sessions")
+            .select("id,organization_id,expires_at,reason,organizations(id,name,industry,website,description)")
+            .eq("user_id", req.user.id)
+            .is("ended_at", null)
+            .gt("expires_at", new Date().toISOString()))
+        : [];
       res.json({
         user: { id: req.user.id, email: req.user.email },
         profile: result(profile),
         memberships: result(memberships),
-        platformOwner: result(roles).some((r) => r.role === "platform_owner"),
-        supportSessions: result(support),
+        platformOwner,
+        supportSessions,
       });
     }),
   );
@@ -792,23 +806,18 @@ export function createApp({
       res.json({ organization_id: org });
     }),
   );
+  app.use("/api/platform", auth, wrap(async (req, res, next) => {
+    const roles = result(await req.db.from("platform_roles").select("role").eq("user_id", req.user.id));
+    if (!roles.some((row) => row.role === "platform_owner"))
+      return res.status(403).json({ error: "Platform owner access required" });
+    next();
+  }));
   app.get(
     "/api/platform/organizations",
-    auth,
     wrap(async (req, res) => {
-      const roles = result(
-        await req.db
-          .from("platform_roles")
-          .select("role")
-          .eq("user_id", req.user.id),
-      );
-      if (!roles.length)
-        return res
-          .status(403)
-          .json({ error: "Platform owner access required" });
       res.json({
         organizations: result(
-          await req.db
+          await admin()
             .from("organizations")
             .select("id,name,industry,created_at")
             .order("created_at", { ascending: false })
@@ -819,7 +828,6 @@ export function createApp({
   );
   app.post(
     "/api/platform/support",
-    auth,
     wrap(async (req, res) => {
       const data = z
         .object({
@@ -838,7 +846,6 @@ export function createApp({
   );
   app.delete(
     "/api/platform/support/:id",
-    auth,
     wrap(async (req, res) => {
       result(
         await req.db.rpc("end_support_session", {
@@ -982,18 +989,7 @@ export function createApp({
   );
   app.get(
     "/api/platform/demo-requests",
-    auth,
-    wrap(async (req, res) => {
-      const roles = result(
-        await req.db
-          .from("platform_roles")
-          .select("role")
-          .eq("user_id", req.user.id),
-      );
-      if (!roles.length)
-        return res
-          .status(403)
-          .json({ error: "Platform owner access required" });
+    wrap(async (_req, res) => {
       res.json({
         requests: result(
           await admin()

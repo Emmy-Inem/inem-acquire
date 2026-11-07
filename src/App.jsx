@@ -1,6 +1,6 @@
 import { AuthPage, SetupPage, LiveDemoForm } from "./live/AuthPages";
-import { RequireAuth } from "./live/AuthContext";
-import { LiveWorkspace } from "./live/Workspace";
+import { RequireAuth, SupportScope } from "./live/AuthContext";
+import { LiveWorkspace, PlatformConsole } from "./live/Workspace";
 import { AnimatedPreview } from "./PlatformMotion";
 import WorkflowPreview from "./WorkflowPreview";
 import HeroVideo from "./HeroVideo";
@@ -1355,6 +1355,11 @@ export default function App() {
             <LiveWorkspace />
           </RequireAuth>
         }
+      />
+      <Route path="/platform" element={<RequireAuth><PlatformConsole /></RequireAuth>} />
+      <Route
+        path="/support/:organizationId/*"
+        element={<RequireAuth><SupportScope><LiveWorkspace /></SupportScope></RequireAuth>}
       />
       <Route path="*" element={<NotFound />} />
     </Routes>

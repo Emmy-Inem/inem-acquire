@@ -1,0 +1,11 @@
+Inem Acquire Discovery uses the Overture Maps Foundation Places release 2026-10-21.0.
+https://overturemaps.org/
+https://docs.overturemaps.org/attribution/#places
+
+The catalog filters Nigerian records, normalizes contact formats and selects fields
+for Discovery. Listings marked as needing review include uncategorized and broad
+education listings. The original place ID and upstream source licenses are retained.
+
+See the accompanying CDLA Permissive 2.0, CC0 1.0 and Apache 2.0 licenses.
+The Foursquare Open Source Places data was transformed to the Overture schema and
+further filtered and normalized by Inem Acquire. See NOTICE-Foursquare.txt.

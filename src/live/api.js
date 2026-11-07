@@ -1,6 +1,6 @@
 export async function api(
   path,
-  { method = "GET", body, organizationId, signal } = {},
+  { method = "GET", body, organizationId, supportSessionId, signal } = {},
 ) {
   const response = await fetch("/api" + path, {
     method,
@@ -8,6 +8,7 @@ export async function api(
     headers: {
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
       ...(organizationId ? { "x-organization-id": organizationId } : {}),
+      ...(supportSessionId ? { "x-support-session-id": supportSessionId } : {}),
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     signal,

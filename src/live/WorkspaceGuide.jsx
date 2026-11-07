@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { useAuth } from "./AuthContext";
 export default function WorkspaceGuide() {
+  const { workspaceBase } = useAuth();
   return (
     <>
       <div className="pageHeader">
@@ -60,7 +62,7 @@ export default function WorkspaceGuide() {
             <small className="guideStep">{number}</small>
             <h2>{title}</h2>
             <p>{description}</p>
-            <Link to={"/app/" + path}>
+            <Link to={workspaceBase + "/" + path}>
               {label}
               <ArrowRight size={16} />
             </Link>

@@ -5,7 +5,7 @@
       "destination": "/api"
     },
     {
-      "source": "/((?!api/|assets/|brand/|images/|videos/).*)",
+      "source": "/((?!api/|assets/|brand/|images/|videos/|data-notices/).*)",
       "destination": "/index.html"
     }
   ],

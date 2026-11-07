@@ -49,12 +49,12 @@ async function account(label) {
   ok(await db.auth.signInWithPassword({ email, password }));
   return { agent, db, id: created.user.id, email };
 }
-function post(a, path, org, body) {
-  return a.agent
-    .post("/api" + path)
+function post(a, path, org, body, supportId) {
+  const req = a.agent.post("/api" + path)
     .set("Origin", origin)
-    .set("x-organization-id", org)
-    .send(body);
+    .set("x-organization-id", org);
+  if (supportId) req.set("x-support-session-id", supportId);
+  return req.send(body);
 }
 try {
   const a = await account("a"),
@@ -322,8 +322,30 @@ try {
     .select("*")
     .eq("organization_id", a.org);
   assert.equal(supportDenied.data.length, 0); // platform ownership alone does not grant tenant data access
+  const orgOutsideMembership = ok(await b.db.from("organizations").select("id").eq("id", a.org));
+  assert.deepEqual(orgOutsideMembership, []);
   const ownerDirectory = await b.agent.get("/api/platform/organizations");
   assert.equal(ownerDirectory.status, 200);
+  assert.ok(ownerDirectory.body.organizations.some((org) => org.id === a.org));
+  const ownSupport = await post(b, "/platform/support", b.org, {
+    organization_id: b.org,
+    reason: "A membership must keep its existing permissions",
+  });
+  assert.equal(ownSupport.status, 403);
+  const blockedCatalog = await a.db.from("discovery_catalog").select("overture_place_id").limit(1);
+  assert.equal(blockedCatalog.error?.code, "42501");
+  const query = { country: "NG", city: "Lagos", industry: "all" };
+  const discovery = await post(a, "/prospects/public-directory", a.org, query);
+  assert.equal(discovery.status, 200, discovery.body.error);
+  assert.equal(discovery.body.companies.length, 20);
+  assert.equal(discovery.body.hasMore, true);
+  assert.ok(discovery.body.companies.every((row) => row.directory === "Overture" && (row.phone || row.email)));
+  const next = await post(a, "/prospects/public-directory", a.org, { ...query, page: 2 });
+  assert.equal(next.status, 200, next.body.error);
+  assert.ok(next.body.companies.every((row) => !discovery.body.companies.some((first) => row.id === first.id)));
+  const crossOrgDiscovery = await post(a, "/prospects/public-directory", b.org, query);
+  assert.equal(crossOrgDiscovery.status, 403);
+  check("authenticated organization Discovery pages through the protected Nigerian catalog");
   const support = await b.agent
     .post("/api/platform/support")
     .set("Origin", origin)
@@ -332,9 +354,23 @@ try {
       reason: "Integration test support access",
     });
   assert.equal(support.status, 200, support.body.error);
-  const supportWrite = await post(b, "/resources/tasks", a.org, {
-    title: "Support follow-up",
-  });
+  const supportId = support.body.id;
+  const unscoped = await post(b, "/resources/tasks", a.org, { title: "Unscoped support" });
+  assert.equal(unscoped.status, 403);
+  const scopedToWrongOrg = await post(b, "/resources/tasks", b.org, { title: "Wrong scope" }, supportId);
+  assert.equal(scopedToWrongOrg.status, 403);
+  const spoofed = await post(a, "/resources/tasks", a.org, { title: "Stolen session" }, supportId);
+  assert.equal(spoofed.status, 403);
+  const boot = await b.agent.get("/api/bootstrap");
+  assert.ok(boot.body.supportSessions.some((item) => item.id === supportId && item.organizations.id === a.org));
+  const supportManage = await b.agent.patch("/api/organization")
+    .set("Origin", origin).set("x-organization-id", a.org)
+    .set("x-support-session-id", supportId).send({ name: "Restricted" });
+  assert.equal(supportManage.status, 403);
+  const supportExport = await b.agent.get("/api/export/prospects")
+    .set("x-organization-id", a.org).set("x-support-session-id", supportId);
+  assert.equal(supportExport.status, 403);
+  const supportWrite = await post(b, "/resources/tasks", a.org, { title: "Support follow-up" }, supportId);
   assert.equal(supportWrite.status, 201, supportWrite.body.error);
   await b.agent
     .delete("/api/platform/support/" + a.org)
@@ -342,7 +378,7 @@ try {
     .send({});
   const afterSupport = await post(b, "/resources/tasks", a.org, {
     title: "Must be denied again",
-  });
+  }, supportId);
   assert.equal(afterSupport.status, 403);
   check("platform-owner support access is time-limited, audited and revocable");
   const audit = ok(

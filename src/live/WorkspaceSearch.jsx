@@ -11,7 +11,7 @@ const groups = [
   ["tasks", "Tasks", "title", "tasks"],
 ];
 export default function WorkspaceSearch() {
-  const { organization } = useAuth();
+  const { organization, workspaceBase } = useAuth();
   const [open, setOpen] = useState(false),
     [query, setQuery] = useState(""),
     [results, setResults] = useState([]),
@@ -58,7 +58,7 @@ export default function WorkspaceSearch() {
                 resource +
                 "?limit=5&search=" +
                 encodeURIComponent(query.trim()),
-              { organizationId: organization?.id, signal: controller.signal },
+              { organizationId: organization?.id, supportSessionId: organization?.support?.id, signal: controller.signal },
             );
             return { label, path, field, rows: r.data };
           }),
@@ -141,7 +141,7 @@ export default function WorkspaceSearch() {
                         <Link
                           key={row.id}
                           to={
-                            "/app/" +
+                            workspaceBase + "/" +
                             g.path +
                             "?search=" +
                             encodeURIComponent(row[g.field])

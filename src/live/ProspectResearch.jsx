@@ -7,13 +7,14 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
-async function streamEnrichment(organizationId, websites, signal, onRow) {
+async function streamEnrichment(organization, websites, signal, onRow) {
   const response = await fetch("/api/prospects/enrich", {
     method: "POST",
     credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
-      "x-organization-id": organizationId,
+      "x-organization-id": organization.id,
+      ...(organization.support ? { "x-support-session-id": organization.support.id } : {}),
     },
     body: JSON.stringify({ websites }),
     signal,
@@ -37,6 +38,10 @@ async function streamEnrichment(organizationId, websites, signal, onRow) {
   } finally {
     reader.releaseLock();
   }
+}
+
+function rowKey(row) {
+  return row.id || row.source_url;
 }
 
 function contactInfo(row, checked) {
@@ -70,7 +75,9 @@ export default function ProspectResearch({ onSaved }) {
   const { organization } = useAuth();
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("NG");
-  const [industry, setIndustry] = useState("technology");
+  const [industry, setIndustry] = useState("all");
+  const [keyword, setKeyword] = useState("");
+  const [catalogPage, setCatalogPage] = useState(null);
   const [websites, setWebsites] = useState("");
   const [rows, setRows] = useState([]);
   const [checked, setChecked] = useState({});
@@ -90,6 +97,7 @@ export default function ProspectResearch({ onSaved }) {
       body,
       signal,
       organizationId: organization.id,
+      supportSessionId: organization.support?.id,
     });
   }
 
@@ -97,20 +105,21 @@ export default function ProspectResearch({ onSaved }) {
     const targets = companies.filter((row) => row.website).slice(0, 12);
     if (!targets.length) return;
     setPhase("checking");
-    setChecking(targets.map((row) => row.source_url));
+    setChecking(targets.map(rowKey));
     const report = (key, result) =>
       setChecked((current) => ({ ...current, [key]: result }));
-    const remaining = new Set(targets.map((row) => row.source_url));
+    const remaining = new Set(targets.map(rowKey));
     try {
       await streamEnrichment(
-        organization.id,
+        organization,
         targets.map((row) => ({
           website: row.website,
           country: row.country || defaultCountry,
         })),
         job.signal,
         (result) => {
-          const key = targets[result.index]?.source_url;
+          const target = targets[result.index];
+          const key = target && rowKey(target);
           if (!key) return;
           remaining.delete(key);
           report(key, result);
@@ -129,7 +138,7 @@ export default function ProspectResearch({ onSaved }) {
     }
   }
 
-  async function start(load, defaultCountry) {
+  async function start(load, defaultCountry, catalogQuery) {
     if (controller.current) return;
     const job = new AbortController();
     controller.current = job;
@@ -137,12 +146,15 @@ export default function ProspectResearch({ onSaved }) {
     setError("");
     setNotice("");
     setRows([]);
+    setCatalogPage(null);
     setChecked({});
     setContactsOnly(false);
     try {
       const result = await load(job.signal);
       if (job.signal.aborted) return;
       setRows(result.companies);
+      if (catalogQuery && typeof result.hasMore === "boolean")
+        setCatalogPage({ query: catalogQuery, hasMore: result.hasMore });
       setNotice(
         result.companies.length
           ? result.ranked
@@ -150,7 +162,7 @@ export default function ProspectResearch({ onSaved }) {
             : ""
           : "No companies matched. Try a nearby city or another industry.",
       );
-      await enrich(result.companies, job, defaultCountry);
+      await enrich(result.companies.filter((row) => row.directory !== "Overture"), job, defaultCountry);
     } catch (error) {
       if (!job.signal.aborted) setError(error.message);
     } finally {
@@ -159,6 +171,19 @@ export default function ProspectResearch({ onSaved }) {
         setPhase("");
       }
     }
+  }
+
+  function searchDirectory(query) {
+    start(async (signal) => {
+      const result = await request("/prospects/public-directory", query, signal);
+      return {
+        ...result,
+        companies: result.companies.map((row) => ({
+          ...row,
+          city: row.city || (row.directory !== "Overture" ? query.city : null),
+        })),
+      };
+    }, query.country, query);
   }
 
   function checkLinks(event) {
@@ -200,9 +225,9 @@ export default function ProspectResearch({ onSaved }) {
     }
   }
 
-  const complete = rows.filter((row) => checked[row.source_url]).length;
+  const complete = rows.filter((row) => checked[rowKey(row)]).length;
   const withContacts = rows.filter((row) => {
-    const info = contactInfo(row, checked[row.source_url]);
+    const info = contactInfo(row, checked[rowKey(row)]);
     return info.emails.length || info.phones.length;
   });
   const shown = contactsOnly ? withContacts : rows;
@@ -216,8 +241,8 @@ export default function ProspectResearch({ onSaved }) {
         <div>
           <h2 id="lead-finder-title">Find companies and public contacts</h2>
           <p>
-            Search by location and industry. Contact details appear as each
-            website is checked.
+            Search the Nigerian business catalog by name, location or industry.
+            Open the sources or check a business website for more details.
           </p>
         </div>
       </div>
@@ -225,28 +250,14 @@ export default function ProspectResearch({ onSaved }) {
         className="researchForm"
         onSubmit={(event) => {
           event.preventDefault();
-          start(async (signal) => {
-            const location = city.trim();
-            const result = await request(
-              "/prospects/public-directory",
-              { city: location, country, industry },
-              signal,
-            );
-            return {
-              ...result,
-              companies: result.companies.map((row) => ({
-                ...row,
-                city: location,
-              })),
-            };
-          }, country);
+          searchDirectory({ city, country, industry, keyword: country === "NG" ? keyword : "", page: 1 });
         }}
       >
         <label className="field">
-          <span>City</span>
+          <span>City or state</span>
           <input
-            required
-            minLength={2}
+            required={country !== "NG"}
+            minLength={country === "NG" ? undefined : 2}
             maxLength={75}
             value={city}
             onChange={(e) => setCity(e.target.value)}
@@ -260,7 +271,11 @@ export default function ProspectResearch({ onSaved }) {
             pattern="[A-Za-z]{2}"
             maxLength={2}
             value={country}
-            onChange={(e) => setCountry(e.target.value.toUpperCase())}
+            onChange={(e) => {
+              const code = e.target.value.toUpperCase();
+              setCountry(code);
+              if (code !== "NG" && industry === "all") setIndustry("technology");
+            }}
           />
         </label>
         <label className="field">
@@ -270,6 +285,7 @@ export default function ProspectResearch({ onSaved }) {
             value={industry}
             onChange={(e) => setIndustry(e.target.value)}
           >
+            {country === "NG" && <option value="all">All industries</option>}
             {Object.entries(industries).map(([id, item]) => (
               <option key={id} value={id}>
                 {item.label}
@@ -277,6 +293,12 @@ export default function ProspectResearch({ onSaved }) {
             ))}
           </select>
         </label>
+        {country === "NG" && (
+          <label className="field">
+            <span>Company or keyword</span>
+            <input value={keyword} maxLength={100} onChange={(e) => setKeyword(e.target.value)} placeholder="e.g. bakery" />
+          </label>
+        )}
         <button className="btn primary" disabled={!!phase}>
           {phase === "searching" ? "Finding companies…" : "Find companies"}
         </button>
@@ -352,7 +374,7 @@ export default function ProspectResearch({ onSaved }) {
                 </thead>
                 <tbody>
                   {shown.map((row) => {
-                    const key = row.source_url;
+                    const key = rowKey(row);
                     const result = checked[key];
                     const info = contactInfo(row, result);
                     const waiting = checking.includes(key) && !result;
@@ -384,11 +406,11 @@ export default function ProspectResearch({ onSaved }) {
                           )}
                           <details className="leadEvidenceLinks">
                             <summary>Sources</summary>
-                            <a href={key} target="_blank" rel="noreferrer">
-                              Company listing
+                            <a href={row.source_url} target="_blank" rel="noreferrer">
+                              {row.directory === "Overture" ? "Overture Maps Explorer" : "Company listing"}
                             </a>
                             {info.pages
-                              .filter((page) => page.source !== key)
+                              .filter((page) => page.source !== row.source_url)
                               .map((page, index) => (
                                 <a
                                   key={page.source}
@@ -418,10 +440,11 @@ export default function ProspectResearch({ onSaved }) {
                         <td data-label="Company details">
                           <div className="leadCompanyFacts">
                             <span>
-                              {[row.industry, row.city, row.country]
+                              {[row.industry, row.city, row.region, row.country]
                                 .filter(Boolean)
                                 .join(" · ") || "Website research"}
                             </span>
+                            {row.needsReview && <span className="leadMuted">Business category needs review</span>}
                             {info.address && <span>{info.address}</span>}
                             {info.employees && (
                               <span>{info.employees} employees</span>
@@ -483,6 +506,9 @@ export default function ProspectResearch({ onSaved }) {
                                   const notes = [
                                     row.directory === "OpenStreetMap" &&
                                       "© OpenStreetMap contributors · ODbL · https://www.openstreetmap.org/copyright",
+                                    row.directory === "Overture" &&
+                                      ["Overture Maps Foundation", row.release, row.id, "https://docs.overturemaps.org/attribution/#places"].join(" · "),
+                                    row.needsReview && "Business category needs review",
                                     info.address && "Address: " + info.address,
                                     info.employees &&
                                       "Employees: " + info.employees,
@@ -506,7 +532,7 @@ export default function ProspectResearch({ onSaved }) {
                                     website: row.website,
                                     industry: row.industry,
                                     country: row.country,
-                                    source_url: key,
+                                    source_url: row.source_url,
                                     notes,
                                   });
                                   setSaved((current) => ({
@@ -538,6 +564,19 @@ export default function ProspectResearch({ onSaved }) {
           ) : (
             <p className="leadEmpty">
               No results with public email or phone details yet.
+            </p>
+          )}
+          {catalogPage && (
+            <nav className="leadResultToolbar" aria-label="Discovery pages">
+              <button className="btn secondary" disabled={!!phase || catalogPage.query.page === 1} onClick={() => searchDirectory({ ...catalogPage.query, page: catalogPage.query.page - 1 })}>Previous</button>
+              <span>Page {catalogPage.query.page}</span>
+              <button className="btn secondary" disabled={!!phase || !catalogPage.hasMore} onClick={() => searchDirectory({ ...catalogPage.query, page: catalogPage.query.page + 1 })}>Next</button>
+            </nav>
+          )}
+          {shown.some((row) => row.directory === "Overture") && (
+            <p className="leadCredit">
+              Listings from Overture Maps Foundation. Contact details may change.{" "}
+              <a href="/data-notices/overture/NOTICE.txt" target="_blank" rel="noreferrer">Source and license notices</a>
             </p>
           )}
           {shown.some((row) => row.directory === "OpenStreetMap") && (
