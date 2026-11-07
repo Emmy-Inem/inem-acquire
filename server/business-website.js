@@ -1,3 +1,4 @@
+import { websiteIdentity } from "./website-identity.js";
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
 import { request as httpRequest } from "node:http";
@@ -94,7 +95,7 @@ async function fetchPage(value, signal, hops = 0, allowed = () => true) {
 
 export async function scanBusinessWebsite(
   website,
-  { country, signal: caller } = {},
+  { country, signal: caller, expectedName } = {},
 ) {
   const entry = webUrl(website);
   if (!entry)
@@ -125,6 +126,14 @@ export async function scanBusinessWebsite(
     const page = await fetchPage(entry, signal, 0, allowed);
     if (page.status !== 200 || !page.text)
       throw new Error("The website did not return an accessible page");
+    if (expectedName) {
+      const identity = websiteIdentity(page.text, expectedName);
+      if (identity.status !== "verified") throw new Error(
+        identity.status === "unavailable"
+          ? "This website is unavailable or parked."
+          : "This website could not be matched to the business.",
+      );
+    }
     const home = extractContacts(page.text, page.url, country);
     const origin = new URL(page.url).origin;
     const candidates = new Map();
@@ -184,6 +193,8 @@ export async function scanBusinessWebsite(
       }));
   } catch (error) {
     const messages = [
+      "This website is unavailable or parked.",
+      "This website could not be matched to the business.",
       "Only public business websites can be checked",
       "The website restricts automated access",
       "The website did not return an accessible page",

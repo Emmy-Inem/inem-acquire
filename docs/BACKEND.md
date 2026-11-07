@@ -114,3 +114,11 @@ node tests/auth-session.browser.js
 ```
 
 Integration tests create and remove uniquely named fixture users and organizations in the configured project. They do not send emails, charge a card or run provider searches. Browser checks require installed Chrome and the local API/Vite servers. RLS, roles, cross-tenant references, support access, campaign approval, signature checks, cookies and real record persistence are covered. Production-provider delivery and payment capture remain untested until those services are activated.
+
+## November launch review
+
+The 10-organization smoke run created 10 temporary accounts and populated offers, profiles, prospects, contacts, lists, campaign drafts, deals, tasks and reports. Parallel read, diagnosis and Discovery requests passed, and foreign-organization requests were denied. Fixtures were removed. This is a functional pilot check, not a sustained traffic benchmark.
+
+Discovery source licenses are linked at /data-sources. Published website links require a recent match to the business name or company markup. Unreviewed, unmatched, inaccessible and parked pages show a verification state. Contact information can still be reviewed independently. The verify-discovery-websites script reviews a resumable batch, and catalog website changes invalidate previous checks.
+
+Campaign delivery and paid billing require configured live providers and an end-to-end provider test before those features are offered. Auth email uses its separately configured Supabase SMTP sender.

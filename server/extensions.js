@@ -373,6 +373,33 @@ export function extensionRoutes(
     }),
   );
   app.post(
+    "/api/prospects/verify-catalog-website",
+    auth,
+    organization("write"),
+    researchLimit,
+    wrap(async (req, res) => {
+      const { id } = z.object({ id: z.string().min(1).max(100) }).strict().parse(req.body);
+      const db = admin();
+      const item = result(await db.from("discovery_catalog").select("name,website").eq("overture_place_id", id).maybeSingle());
+      if (!item?.website) return res.status(404).json({ error: "No website is available for this business." });
+      let contacts = [], status = "verified", error;
+      try {
+        contacts = await scanBusinessWebsite(item.website, { country: "NG", expectedName: item.name });
+      } catch (failure) {
+        status = failure.message === "This website is unavailable or parked." ? "unavailable" : "needs_review";
+        error = failure.message;
+      }
+      const updated = result(await db.from("discovery_catalog")
+        .update({ website_status: status, website_checked_at: new Date().toISOString() })
+        .eq("overture_place_id", id).eq("website", item.website).select("overture_place_id"));
+      if (!updated.length) return res.status(409).json({ error: "The listing changed. Refresh the results before checking again." });
+      res.json({
+        websiteStatus: status, website: status === "verified" ? item.website : null,
+        contacts, error,
+      });
+    }),
+  );
+  app.post(
     "/api/prospects/check-website",
     auth,
     organization("write"),
@@ -398,6 +425,7 @@ export function extensionRoutes(
               z
                 .object({
                   website: z.string().trim().max(500).url(),
+                  name: z.string().trim().min(1).max(200).optional(),
                   country: z
                     .string()
                     .regex(/^[A-Z]{2}$/)
@@ -419,14 +447,15 @@ export function extensionRoutes(
       const worker = async () => {
         while (!stop.signal.aborted && cursor < websites.length) {
           const index = cursor++;
-          const { website, country } = websites[index];
+          const { website, country, name } = websites[index];
           let row;
           try {
             const contacts = await scanBusinessWebsite(website, {
               country,
               signal: stop.signal,
+              expectedName: name,
             });
-            row = { index, contacts };
+            row = { index, contacts, websiteStatus: name ? "verified" : "unreviewed", website: name ? website : null };
           } catch (error) {
             row = { index, error: error.message };
           }

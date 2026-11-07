@@ -131,6 +131,7 @@ export default function ProspectResearch({ onSaved }) {
         organization,
         targets.map((row) => ({
           website: row.website,
+          ...(row.directory ? { name: row.name } : {}),
           country: row.country || defaultCountry,
         })),
         job.signal,
@@ -469,6 +470,7 @@ export default function ProspectResearch({ onSaved }) {
                     const key = rowKey(row);
                     const result = checked[key];
                     const info = contactInfo(row, result);
+                    const displayWebsite = result?.websiteStatus === "verified" ? result.website : row.websiteStatus === "verified" || (!row.directory && !row.catalog) ? row.website : null;
                     const waiting = checking.includes(key) && !result;
                     const status = waiting
                       ? "Checking…"
@@ -476,6 +478,8 @@ export default function ProspectResearch({ onSaved }) {
                         ? "Unavailable"
                         : result
                           ? "Not published"
+                          : row.catalog
+                            ? "Not listed"
                           : row.website
                             ? "Not checked"
                             : "No website";
@@ -486,14 +490,15 @@ export default function ProspectResearch({ onSaved }) {
                             {info.pages.find((page) => page.details?.name)
                               ?.details.name || row.name}
                           </strong>
-                          {row.website && (
+                          {!displayWebsite && (row.hasWebsite || row.website) && <small className="leadWebsiteStatus">{result?.websiteStatus === "unavailable" || row.websiteStatus === "unavailable" ? "Website unavailable" : "Website needs verification"}</small>}
+                          {displayWebsite && (
                             <a
                               className="leadWebsite"
-                              href={row.website}
+                              href={displayWebsite}
                               target="_blank"
                               rel="noreferrer"
                             >
-                              {new URL(row.website).hostname}
+                              {new URL(displayWebsite).hostname}
                             </a>
                           )}
 
@@ -540,7 +545,7 @@ export default function ProspectResearch({ onSaved }) {
                         </td>
                         <td>
                           <div className="leadActions">
-                            {row.website &&
+                            {(row.website || row.hasWebsite) &&
                               (!result || result.error) &&
                               !phase && (
                                 <button
@@ -556,7 +561,14 @@ export default function ProspectResearch({ onSaved }) {
                                       return next;
                                     });
                                     try {
-                                      await enrich([row], job, country);
+                                      if (row.catalog) {
+                                        setPhase("checking");
+                                        setChecking([key]);
+                                        const check = await request("/prospects/verify-catalog-website", { id: row.id }, job.signal);
+                                        setChecked((current) => ({ ...current, [key]: check }));
+                                      } else {
+                                        await enrich([row], job, country);
+                                      }
                                     } catch (error) {
                                       if (!job.signal.aborted)
                                         setError(error.message);
@@ -564,11 +576,12 @@ export default function ProspectResearch({ onSaved }) {
                                       if (controller.current === job) {
                                         controller.current = null;
                                         setPhase("");
+                                        setChecking([]);
                                       }
                                     }
                                   }}
                                 >
-                                  Check website
+                                  Verify website
                                 </button>
                               )}
                             <button
@@ -606,7 +619,7 @@ export default function ProspectResearch({ onSaved }) {
                                       info.pages.find(
                                         (page) => page.details?.name,
                                       )?.details.name || row.name,
-                                    website: row.website,
+                                    website: displayWebsite,
                                     industry: row.industry,
                                     country: row.country,
                                     source_url: row.source_url,

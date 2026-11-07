@@ -4,7 +4,7 @@ export async function searchCatalog(db, { city, country, industry, keyword, page
   const offset = (page - 1) * pageSize;
   let search = db
     .from("discovery_catalog")
-    .select("overture_place_id,name,category,phone,email,website,city,region,address,country,needs_review,source_release,listing_source,email_evidence_url,phone_evidence_url,contact_checked_at")
+    .select("overture_place_id,name,category,phone,email,website,city,region,address,country,needs_review,source_release,listing_source,email_evidence_url,phone_evidence_url,contact_checked_at,website_status,website_checked_at")
     .eq("country", country)
     .order("needs_review")
     .order("name")
@@ -25,7 +25,11 @@ export async function searchCatalog(db, { city, country, industry, keyword, page
       industry: row.category?.replaceAll("_", " ") || null,
       phone: /^\+234\d{10}$/.test(row.phone || "") ? row.phone : null,
       email: /^[a-z0-9][a-z0-9._%+-]*@[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(row.email || "") ? row.email : null,
-      website: webUrl(row.website),
+      website: row.website_status === "verified" && Date.parse(row.website_checked_at) > Date.now() - 30 * 86400000
+        ? webUrl(row.website) : null,
+      hasWebsite: !!webUrl(row.website),
+      websiteStatus: row.website_status === "verified" && !(Date.parse(row.website_checked_at) > Date.now() - 30 * 86400000)
+        ? "unreviewed" : row.website_status,
       city: row.city,
       region: row.region,
       address: row.address,

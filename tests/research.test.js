@@ -1,3 +1,4 @@
+import { websiteIdentity } from "../server/website-identity.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -166,4 +167,12 @@ test("Gemini plans a live directory search and catalog duplicates are excluded",
   assert.deepEqual(result.companies.map(({ name, source_url }) => [name, source_url]), [
     ["New Bakery", "https://www.openstreetmap.org/way/200"],
   ]);
+});
+
+test("website identity rejects parked domains and mismatched business pages", () => {
+  assert.equal(websiteIdentity("<title>New Dawn Properties | Lagos</title><h1>New Dawn Properties</h1>", "New Dawn Properties Limited").status, "verified");
+  assert.equal(websiteIdentity("<title>Different business</title><h1>Our company</h1>", "New Dawn Properties").status, "needs_review");
+  assert.equal(websiteIdentity("<title>New Dawn Properties</title><p>This domain is for sale</p>", "New Dawn Properties").status, "unavailable");
+  assert.equal(websiteIdentity('<title>Homepage</title><script type="application/ld+json">{"@type":"Person","name":"New Dawn Properties"}</script>', "New Dawn Properties").status, "needs_review");
+  assert.equal(websiteIdentity("<title>Our services</title><h1>International Group</h1>", "International Group").status, "needs_review");
 });
