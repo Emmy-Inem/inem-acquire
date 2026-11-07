@@ -83,12 +83,24 @@ async function scan(row) {
 }
 
 console.log("Eligible sites", candidates.length, "checking", targets.length);
+async function appendCheckpoint(line) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await appendFile(output, line);
+      return;
+    } catch (error) {
+      if (attempt >= 5 || !["EBUSY", "EPERM"].includes(error.code)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 40 * (2 ** attempt)));
+    }
+  }
+}
+
 async function worker() {
   while (cursor < targets.length) {
     const row = targets[cursor++];
     const result = await scan(row);
     const line = JSON.stringify(result) + "\n";
-    writes = writes.then(() => appendFile(output, line));
+    writes = writes.then(() => appendCheckpoint(line));
     await writes;
     if (result.status === "found") matched += 1;
     done += 1;
