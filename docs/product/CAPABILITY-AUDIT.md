@@ -30,3 +30,8 @@ Browser coverage includes all workspace routes and rendered 320, 390, 820 and 14
 - Paid outbound delivery/inbound email and paid checkout still require their live provider/domain configuration and delivery/payment tests. Auth email configuration does not establish a campaign sender for every organization.
 - SSO and custom enterprise integrations are scoped services, not enabled self-service features. Pricing now states this explicitly.
 - Do not describe the release as having verified every catalog record or activated billing/email services that remain unconfigured.
+## Production verification update
+
+The deployed Advisor returned an AI-assisted answer successfully. Live task completion/reopen, company asset pages, unified public pricing and the research credit meter passed after fixing the billing table's date-column ordering. Google web-search grounding returned provider 429 on the connected account; the tested Lagos/software expanded search therefore returned five additional businesses, not fifty. Treat live web-search capacity as an unresolved launch gate. Do not advertise a guaranteed 50 verified contacts per query.
+
+Website recovery also supports unverified domain hypotheses from the working standard AI model when live search is unavailable. They are never exposed as confirmed domains until the same first-party identity and public phone/location checks succeed. This fallback improves recovery; it does not establish that all historical catalog websites have been corrected.

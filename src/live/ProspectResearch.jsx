@@ -346,7 +346,7 @@ export default function ProspectResearch({ onSaved }) {
               (result.snapshot
                 ? "Showing additional business websites."
                 : "Showing new matches from public directories.") +
-              (result.partial ? " Some live sources were unavailable." : "") +
+              (result.partial ? " Some live sources were unavailable. Live web search may be limited by the search provider; available public directory results are shown." : "") +
               (result.availability ? " " + result.availability : "")
             : "No additional matches from the available directories. Try another business keyword or location."
           : result.companies.length

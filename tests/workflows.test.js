@@ -61,6 +61,7 @@ test("website recovery confirms a replacement only after company identity and pu
   );
   assert.equal(result.websiteStatus, "verified");
   assert.equal(result.website, "https://new.example/");
+  assert.equal(corroboratesBusiness({phone:"+2348012345678",city:"Lagos"},[{phones:["+2348099999999"],details:{address:"Lagos"}}]),false);
   assert.equal(result.recovered, true);
   assert.deepEqual(result.contacts, pages);
   assert.equal(
@@ -174,4 +175,31 @@ test("explicitly published business mail links can expose named inboxes without 
     "https://company.example/contact",
   );
   assert.deepEqual(result.emails, ["business.owner@gmail.com"]);
+});
+
+test("verified website recovery can use AI domain hypotheses when paid/live search is unavailable", async () => {
+  const result = await resolveBusinessWebsite(
+    { GEMINI_API_KEY: "test" },
+    { name: "Acme", website: "https://old.example/", phone: "+2348012345678" },
+    {
+      search: async () => ({ available: false, candidates: [] }),
+      propose: async () => ({
+        available: true,
+        candidates: [{ website: "https://real.example/" }],
+      }),
+      scan: async (url) => {
+        if (url.includes("old.")) throw Error("Could not read");
+        return [
+          {
+            source: url,
+            phones: ["+2348012345678"],
+            emails: [],
+            details: { name: "Acme" },
+          },
+        ];
+      },
+    },
+  );
+  assert.equal(result.recovered, true);
+  assert.equal(result.website, "https://real.example/");
 });
