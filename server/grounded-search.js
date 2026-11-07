@@ -3,7 +3,7 @@ import { webUrl } from "./lead-discovery.js";
 // Public business research only; no tenant records, private documents or credentials.
 export async function groundedBusinessSearch(env, query, { limit = 50 } = {}) {
   if (!env.GEMINI_API_KEY) return { candidates: [], available: false, reason:"not_configured" };
-  const model = env.GEMINI_SEARCH_MODEL || "gemini-2.5-flash";
+  const model = env.GEMINI_SEARCH_MODEL || env.GEMINI_MODEL || "gemini-3.1-flash-lite";
   if (!/^[a-z0-9][a-z0-9.-]{0,79}$/.test(model))
     return { candidates: [], available: false };
   try {
