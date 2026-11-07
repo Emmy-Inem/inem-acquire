@@ -378,6 +378,14 @@ try {
   const next = await post(a, "/prospects/public-directory", a.org, { ...query, page: 2 });
   assert.equal(next.status, 200, next.body.error);
   assert.ok(next.body.companies.every((row) => !discovery.body.companies.some((first) => row.id === first.id)));
+  const later = await post(a, "/prospects/public-directory", a.org, { country: "NG", industry: "all", page: 251, pageSize: 100, contact: "both" });
+  assert.equal(later.status, 200, later.body.error);
+  assert.equal(later.body.companies.length, 100);
+  assert.ok(later.body.companies.every((row) => row.email && row.phone));
+  assert.equal(later.body.hasMore, true);
+  assert.deepEqual(Object.keys(later.body).sort(), ["companies", "hasMore"]);
+  const beyondDenied = await post(a, "/prospects/search-beyond-catalog", b.org, { city: "Lagos", country: "NG", industry: "retail" });
+  assert.equal(beyondDenied.status, 403);
   const crossOrgDiscovery = await post(a, "/prospects/public-directory", b.org, query);
   assert.equal(crossOrgDiscovery.status, 403);
   check("authenticated organization Discovery pages through the protected Nigerian catalog");

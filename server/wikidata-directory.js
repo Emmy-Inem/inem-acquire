@@ -55,11 +55,11 @@ SELECT DISTINCT ?company ?companyLabel ?website ?sectorLabel WHERE {
     if (!id || !name || /^Q\d+$/.test(name) || !website || companies.has(id))
       continue;
     const sector = row.sectorLabel?.value || "";
-    if (!industryPatterns[industry].test(sector)) continue;
+    if (industry && !industryPatterns[industry]?.test(sector)) continue;
     companies.set(id, {
       name: name.slice(0, 200),
       website,
-      industry: sector.slice(0, 120) || industries[industry].label,
+      industry: sector.slice(0, 120) || industries[industry]?.label || null,
       country,
       source_url: "https://www.wikidata.org/wiki/" + id,
       directory: "Wikidata",

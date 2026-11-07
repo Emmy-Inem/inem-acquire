@@ -71,12 +71,26 @@ function ContactColumn({ values, type, status }) {
   );
 }
 
+const countFormat = new Intl.NumberFormat();
+
+function CatalogPager({ query, hasMore, busy, onPage, placement }) {
+  return (
+    <nav className="leadCatalogPager" aria-label={placement + " catalog pagination"}>
+      <button type="button" className="btn secondary" disabled={busy || query.page <= 1} onClick={() => onPage(query.page - 1)}>Previous</button>
+      <span>Page {countFormat.format(query.page)}</span>
+      <button type="button" className="btn secondary" disabled={busy || !hasMore} onClick={() => onPage(query.page + 1)}>Next</button>
+    </nav>
+  );
+}
+
 export default function ProspectResearch({ onSaved }) {
   const { organization } = useAuth();
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("NG");
   const [industry, setIndustry] = useState("all");
   const [keyword, setKeyword] = useState("");
+  const [pageSize, setPageSize] = useState(50);
+  const [contact, setContact] = useState("any");
   const [catalogPage, setCatalogPage] = useState(null);
   const [websites, setWebsites] = useState("");
   const [rows, setRows] = useState([]);
@@ -138,15 +152,17 @@ export default function ProspectResearch({ onSaved }) {
     }
   }
 
-  async function start(load, defaultCountry, catalogQuery) {
+  async function start(load, defaultCountry, catalogQuery, keepCurrent = false) {
     if (controller.current) return;
     const job = new AbortController();
     controller.current = job;
     setPhase("searching");
     setError("");
     setNotice("");
-    setRows([]);
-    setCatalogPage(null);
+    if (!keepCurrent) {
+      setRows([]);
+      setCatalogPage(null);
+    }
     setChecked({});
     setContactsOnly(false);
     try {
@@ -156,7 +172,13 @@ export default function ProspectResearch({ onSaved }) {
       if (catalogQuery && typeof result.hasMore === "boolean")
         setCatalogPage({ query: catalogQuery, hasMore: result.hasMore });
       setNotice(
-        result.companies.length
+        result.outside
+          ? result.companies.length
+            ? (result.geminiUsed ? "Gemini expanded your search. " : "") +
+              (result.snapshot ? "Showing additional Overture business websites." : "Showing new matches from public directories.") +
+              (result.partial ? " Some live sources were unavailable." : "")
+            : "No additional matches from the available directories. Try another business keyword or location."
+          : result.companies.length
           ? result.ranked
             ? "Gemini prioritized the matching categories."
             : ""
@@ -173,7 +195,7 @@ export default function ProspectResearch({ onSaved }) {
     }
   }
 
-  function searchDirectory(query) {
+  function searchDirectory(query, keepCurrent = false) {
     start(async (signal) => {
       const result = await request("/prospects/public-directory", query, signal);
       return {
@@ -183,7 +205,23 @@ export default function ProspectResearch({ onSaved }) {
           city: row.city || (!row.catalog ? query.city : null),
         })),
       };
-    }, query.country, query);
+    }, query.country, query, keepCurrent);
+  }
+
+  function searchBeyondCatalog() {
+    const location = city.trim();
+    if (location.length < 2 || (industry === "all" && keyword.trim().length < 2)) {
+      setError("Enter a city or state and choose an industry or add a business keyword to search beyond the catalog.");
+      return;
+    }
+    start(async (signal) => {
+      const result = await request("/prospects/search-beyond-catalog", { city: location, country, industry, keyword }, signal);
+      return { ...result, outside: true };
+    }, country);
+  }
+
+  function goToPage(page) {
+    searchDirectory({ ...catalogPage.query, page }, true);
   }
 
   function checkLinks(event) {
@@ -231,6 +269,7 @@ export default function ProspectResearch({ onSaved }) {
     return info.emails.length || info.phones.length;
   });
   const shown = contactsOnly ? withContacts : rows;
+  const firstMatch = catalogPage ? (catalogPage.query.page - 1) * catalogPage.query.pageSize + 1 : 0;
 
   return (
     <section
@@ -250,7 +289,10 @@ export default function ProspectResearch({ onSaved }) {
         className="researchForm"
         onSubmit={(event) => {
           event.preventDefault();
-          searchDirectory({ city, country, industry, keyword: country === "NG" ? keyword : "", page: 1 });
+          searchDirectory({
+            city, country, industry, keyword: country === "NG" ? keyword : "",
+            page: 1, pageSize, contact: country === "NG" ? contact : "any",
+          });
         }}
       >
         <label className="field">
@@ -293,16 +335,20 @@ export default function ProspectResearch({ onSaved }) {
             ))}
           </select>
         </label>
-        {country === "NG" && (
-          <label className="field">
-            <span>Company or keyword</span>
-            <input value={keyword} maxLength={100} onChange={(e) => setKeyword(e.target.value)} placeholder="e.g. bakery" />
-          </label>
-        )}
+        <label className="field">
+          <span>Company or keyword</span>
+          <input value={keyword} maxLength={100} onChange={(e) => setKeyword(e.target.value)} placeholder="e.g. bakery" />
+        </label>
         <button className="btn primary" disabled={!!phase}>
           {phase === "searching" ? "Finding companies…" : "Find companies"}
         </button>
       </form>
+      <div className="leadBeyondCatalog">
+        <button type="button" className="btn secondary" disabled={!!phase} onClick={searchBeyondCatalog}>
+          Search beyond catalog with Gemini
+        </button>
+        <p>Enter a location and a business keyword or industry to look in live public directories.</p>
+      </div>
       <details className="leadWebsiteEntry">
         <summary>Research by website</summary>
         <form className="researchForm" onSubmit={checkLinks}>
@@ -329,7 +375,11 @@ export default function ProspectResearch({ onSaved }) {
       )}
       <div className="leadResultToolbar">
         <p role="status">
-          {rows.length
+          {catalogPage
+            ? rows.length
+              ? "Showing matches " + countFormat.format(firstMatch) + "–" + countFormat.format(firstMatch + rows.length - 1)
+              : "No catalog matches on this page"
+            : rows.length
             ? `${rows.length} ${rows.length === 1 ? "company" : "companies"} · ${withContacts.length} with contact details · ${complete} ${complete === 1 ? "website" : "websites"} checked`
             : notice || (phase ? "Finding matching companies…" : "")}
         </p>
@@ -341,7 +391,7 @@ export default function ProspectResearch({ onSaved }) {
             Stop research
           </button>
         )}
-        {!!rows.length && (
+        {!catalogPage && !!rows.length && (
           <label>
             <input
               type="checkbox"
@@ -352,6 +402,34 @@ export default function ProspectResearch({ onSaved }) {
           </label>
         )}
       </div>
+      {catalogPage && (
+        <div className="leadCatalogControls">
+          <label>
+            <span>Results per page</span>
+            <select value={catalogPage.query.pageSize} disabled={!!phase} onChange={(event) => {
+              const size = Number(event.target.value);
+              setPageSize(size);
+              searchDirectory({ ...catalogPage.query, page: 1, pageSize: size }, true);
+            }}>
+              {[20, 50, 100].map((size) => <option value={size} key={size}>{size}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Contact details</span>
+            <select value={catalogPage.query.contact} disabled={!!phase} onChange={(event) => {
+              const value = event.target.value;
+              setContact(value);
+              searchDirectory({ ...catalogPage.query, page: 1, contact: value }, true);
+            }}>
+              <option value="any">Any contact</option>
+              <option value="email">Has email</option>
+              <option value="phone">Has phone</option>
+              <option value="both">Has email and phone</option>
+            </select>
+          </label>
+          <CatalogPager {...catalogPage} busy={!!phase} onPage={goToPage} placement="Top" />
+        </div>
+      )}
       {rows.length > 0 && (
         <>
           {notice && <p className="leadMuted">{notice}</p>}
@@ -407,7 +485,7 @@ export default function ProspectResearch({ onSaved }) {
                           <details className="leadEvidenceLinks">
                             <summary>Sources</summary>
                             <a href={row.source_url} target="_blank" rel="noreferrer">
-                              {row.catalog ? row.directory + " · " + row.release : "Company listing"}
+                              {row.release ? row.directory + " · " + row.release : "Company listing"}
                             </a>
                             {row.emailEvidence && <a href={row.emailEvidence} target="_blank" rel="noreferrer">Published email source</a>}
                             {row.phoneEvidence && <a href={row.phoneEvidence} target="_blank" rel="noreferrer">Published phone source</a>}
@@ -509,7 +587,7 @@ export default function ProspectResearch({ onSaved }) {
                                   const notes = [
                                     row.directory === "OpenStreetMap" &&
                                       "© OpenStreetMap contributors · ODbL · https://www.openstreetmap.org/copyright",
-                                    row.catalog &&
+                                    row.release &&
                                       [row.directory, row.release, row.id, row.source_url].join(" · "),
                                     row.emailEvidence && "Published email source: " + row.emailEvidence,
                                     row.phoneEvidence && "Published phone source: " + row.phoneEvidence,
@@ -572,13 +650,9 @@ export default function ProspectResearch({ onSaved }) {
             </p>
           )}
           {catalogPage && (
-            <nav className="leadResultToolbar" aria-label="Discovery pages">
-              <button className="btn secondary" disabled={!!phase || catalogPage.query.page === 1} onClick={() => searchDirectory({ ...catalogPage.query, page: catalogPage.query.page - 1 })}>Previous</button>
-              <span>Page {catalogPage.query.page}</span>
-              <button className="btn secondary" disabled={!!phase || !catalogPage.hasMore} onClick={() => searchDirectory({ ...catalogPage.query, page: catalogPage.query.page + 1 })}>Next</button>
-            </nav>
+            <CatalogPager {...catalogPage} busy={!!phase} onPage={goToPage} placement="Bottom" />
           )}
-          {shown.some((row) => row.catalog) && (
+          {shown.some((row) => row.catalog || row.directory === "Overture") && (
             <p className="leadCredit">
               Catalog sources include Overture Maps Foundation and Foursquare Open Source Places.{" "}
               <a href="/data-notices/overture/NOTICE.txt" target="_blank" rel="noreferrer">Source and license notices</a>

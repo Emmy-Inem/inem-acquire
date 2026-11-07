@@ -70,8 +70,8 @@ async function search(env, city, country, industry) {
   return prioritize(env, industries[industry].label, companies);
 }
 
-async function findMappedBusinesses(env, city, country, industry) {
-  const { label, tags } = industries[industry];
+export async function findMappedBusinesses(env, city, country, industry, terms = []) {
+  const { label, tags } = industries[industry] || { label: null, tags: {} };
   const cityPattern = "^" + city.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$";
   const clauses = Object.entries(tags)
     .map(
@@ -79,7 +79,15 @@ async function findMappedBusinesses(env, city, country, industry) {
         `nwr(area.place)(area.country)["${tag}"~"^(${values.join("|")})$"]["name"]; `,
     )
     .join("");
-  const data = `[out:json][timeout:9];area["ISO3166-1"=${JSON.stringify(country)}]["admin_level"="2"]->.country;area["name"~${JSON.stringify(cityPattern)},i]["boundary"="administrative"]->.place;(${clauses});out tags 45;`;
+  const keywordFields = ["name", "brand", "shop", "craft", "office", "amenity", "industrial"];
+  const alternatives = terms
+    .filter((term) => /^[\p{L}\p{M}\d ]+$/u.test(term))
+    .map((term) => term.trim().split(/\s+/).join("[ _-]+"))
+    .join("|");
+  const keywordClauses = alternatives ? keywordFields.map((field) =>
+    'nwr(area.place)(area.country)["name"]["' + field + '"~' + JSON.stringify(alternatives) + ',i];'
+  ).join("") : "";
+  const data = `[out:json][timeout:9];area["ISO3166-1"=${JSON.stringify(country)}]["admin_level"="2"]->.country;area["name"~${JSON.stringify(cityPattern)},i]["boundary"="administrative"]->.place;(${clauses}${keywordClauses});out tags 45;`;
   let records;
   try {
     const endpoint = new URL(
@@ -130,7 +138,7 @@ async function findMappedBusinesses(env, city, country, industry) {
     companies.push({
       name: name.slice(0, 200),
       website: webUrl(fields["contact:website"] || fields.website),
-      industry: category?.replaceAll("_", " ") || label,
+      industry: (category || (terms.length ? fields.shop || fields.craft || fields.office || fields.amenity || fields.industrial : "") || label)?.replaceAll("_", " ") || null,
       country,
       source_url,
       directory: "OpenStreetMap",

@@ -939,3 +939,29 @@
     flex-wrap: wrap;
   }
 }
+
+.leadBeyondCatalog, .leadCatalogControls, .leadCatalogPager {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.leadBeyondCatalog { margin-top: 14px; }
+.leadBeyondCatalog p { margin: 0; color: #52637d; font-size: 13px; }
+.leadCatalogControls { margin: 0 0 14px; align-items: end; }
+.leadCatalogControls label { display: grid; gap: 4px; font-size: 13px; color: #52637d; }
+.leadCatalogControls select {
+  min-height: 44px;
+  border: 1px solid #bdcbe0;
+  border-radius: 8px;
+  background: #fff;
+  color: #162b47;
+  padding: 7px 10px;
+}
+.leadCatalogPager { color: #52637d; font-size: 13px; }
+.leadCatalogPager .btn { min-height: 44px; padding-inline: 11px; }
+.leadCatalogControls .leadCatalogPager { margin-left: auto; }
+.leadTableScroll + .leadCatalogPager { margin-top: 12px; }
+@media (max-width: 640px) {
+  .leadCatalogControls .leadCatalogPager { margin-left: 0; }
+}

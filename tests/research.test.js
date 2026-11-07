@@ -6,6 +6,7 @@ import {
 } from "../server/business-website.js";
 import { findBusinesses } from "../server/lead-discovery.js";
 import { suggestedNextSteps } from "../server/gemini.js";
+import { findOutsideCatalog } from "../server/extended-discovery.js";
 
 test("only published business inboxes and phone links are extracted", () => {
   const row = extractContacts(
@@ -124,4 +125,45 @@ test("Gemini receives standard topics only and failure leaves the evidence flow 
     await suggestedNextSteps({ GEMINI_API_KEY: "test" }, findings),
     [],
   );
+});
+
+test("Gemini plans a live directory search and catalog duplicates are excluded", async (t) => {
+  t.mock.method(globalThis, "fetch", async (target, options) => {
+    const url = new URL(target);
+    if (url.hostname === "generativelanguage.googleapis.com") {
+      const payload = JSON.parse(options.body);
+      assert.match(payload.contents[0].parts[0].text, /baked goods/);
+      return Response.json({
+        candidates: [{ content: { parts: [{ text: '{"terms":["bakery"],"industry":"retail"}' }] } }],
+      });
+    }
+    if (url.hostname === "query.wikidata.org")
+      return new Response(null, { status: 503 });
+    const query = url.searchParams.get("data");
+    assert.match(query, /"ISO3166-1"="NG"/);
+    assert.match(query, /"shop"~"baked\[ _-\]\+goods\|bakery",i/);
+    return Response.json({
+      elements: [
+        { type: "node", id: 100, tags: { name: "Catalog Bakery", shop: "bakery" } },
+        { type: "way", id: 200, tags: { name: "New Bakery", shop: "bakery", website: "https://bakery.example/" } },
+        { type: "node", id: 300, tags: { name: "Irrelevant Office", office: "it" } },
+      ],
+    });
+  });
+  const db = {
+    async rpc(method, { candidate_rows, country_code }) {
+      assert.equal(method, "existing_discovery_matches");
+      assert.equal(country_code, "NG");
+      assert.deepEqual(candidate_rows.map((row) => row.name), ["Catalog Bakery", "New Bakery"]);
+      return { data: [0] };
+    },
+  };
+  const result = await findOutsideCatalog({ GEMINI_API_KEY: "test" }, db, {
+    city: "Lagos", country: "NG", industry: "all", keyword: "baked goods",
+  });
+  assert.equal(result.geminiUsed, true);
+  assert.equal(result.partial, true);
+  assert.deepEqual(result.companies.map(({ name, source_url }) => [name, source_url]), [
+    ["New Bakery", "https://www.openstreetmap.org/way/200"],
+  ]);
 });

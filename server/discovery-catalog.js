@@ -1,8 +1,6 @@
 import { webUrl } from "./lead-discovery.js";
 
-const pageSize = 20;
-
-export async function searchCatalog(db, { city, country, industry, keyword, page }) {
+export async function searchCatalog(db, { city, country, industry, keyword, page, pageSize = 20, contact = "any" }) {
   const offset = (page - 1) * pageSize;
   let search = db
     .from("discovery_catalog")
@@ -15,7 +13,10 @@ export async function searchCatalog(db, { city, country, industry, keyword, page
   if (city) search = search.textSearch("location_search", city, { config: "simple", type: "plain" });
   if (keyword) search = search.textSearch("business_search", keyword, { config: "simple", type: "plain" });
   if (industry !== "all") search = search.contains("industries", [industry]);
-  const { data, error } = await search;
+  if (contact === "email" || contact === "both") search = search.not("email", "is", null);
+  if (contact === "phone" || contact === "both") search = search.not("phone", "is", null);
+  const { data, error, status } = await search;
+  if (status === 416) return { companies: [], hasMore: false };
   if (error) throw Object.assign(new Error("The business catalog is temporarily unavailable."), { status: 503 });
   return {
     companies: data.slice(0, pageSize).map((row) => ({
@@ -40,6 +41,6 @@ export async function searchCatalog(db, { city, country, industry, keyword, page
       phoneEvidence: webUrl(row.phone_evidence_url),
       contactCheckedAt: row.contact_checked_at,
     })),
-    hasMore: data.length > pageSize && page < 250,
+    hasMore: data.length > pageSize,
   };
 }

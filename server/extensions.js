@@ -1,3 +1,4 @@
+import { findOutsideCatalog } from "./extended-discovery.js";
 import { searchCatalog } from "./discovery-catalog.js";
 import express from "express";
 import Stripe from "stripe";
@@ -310,35 +311,65 @@ export function extensionRoutes(
         error: "Please wait a minute before making another research request.",
       }),
   });
+  const catalogLimit = rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    keyGenerator: (req) => req.user.id,
+    handler: (_req, res) => res.status(429).json({ error: "Please wait a minute before browsing more results." }),
+  });
+  const publicText = /^[\p{L}\p{M}\d .,&'’()-]+$/u;
   app.post(
-    "/api/prospects/public-directory",
+    "/api/prospects/search-beyond-catalog",
     auth,
     organization("write"),
     researchLimit,
     wrap(async (req, res) => {
+      const query = z.object({
+        city: z.string().trim().min(2).max(75).regex(publicText),
+        country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
+        industry: z.enum(["all", ...Object.keys(industries)]),
+        keyword: z.string().trim().max(100).default(""),
+      }).strict().parse(req.body);
+      if ((query.keyword && !publicText.test(query.keyword)) ||
+          (query.industry === "all" && !/[\p{L}\p{N}]{2}/u.test(query.keyword)))
+        return res.status(400).json({ error: "Choose an industry or enter a public business keyword." });
+      res.json(await findOutsideCatalog(env, admin(), query));
+    }),
+  );
+  app.post(
+    "/api/prospects/public-directory",
+    auth,
+    organization("write"),
+    catalogLimit,
+    wrap(async (req, res, next) => {
       const query = z
         .object({
           city: z.string().trim().max(75).default(""),
           country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
           industry: z.enum(["all", ...Object.keys(industries)]),
           keyword: z.string().trim().max(100).default(""),
-          page: z.number().int().min(1).max(250).default(1),
+          page: z.number().int().min(1).max(1_000_000).default(1),
+          pageSize: z.union([z.literal(20), z.literal(50), z.literal(100)]).default(20),
+          contact: z.enum(["any", "email", "phone", "both"]).default("any"),
         })
         .strict()
         .parse(req.body);
       if ([query.city, query.keyword].some(
-        (value) => value && !/^[\p{L}\p{M}\d .,&'’()-]+$/u.test(value),
+        (value) => value && !publicText.test(value),
       ))
         return res.status(400).json({ error: "Enter a valid location or business keyword." });
 
       if (query.country === "NG") {
         const result = await searchCatalog(admin(), query);
         if (result.companies.length || query.page > 1 || query.keyword ||
-            !query.city || query.industry === "all") return res.json(result);
+            !query.city || query.industry === "all" || query.contact !== "any") return res.json(result);
       }
       if (query.city.length < 2 || query.industry === "all" || query.keyword || query.page !== 1)
         return res.status(400).json({ error: "For searches outside Nigeria, enter a city and choose an industry." });
-      res.json(await findBusinesses(env, query));
+      return researchLimit(req, res, (error) => {
+        if (error) return next(error);
+        return wrap(async () => res.json(await findBusinesses(env, query)))(req, res, next);
+      });
     }),
   );
   app.post(
