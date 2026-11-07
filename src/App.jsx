@@ -281,6 +281,7 @@ function PublicFooter() {
         <b>Legal</b>
         <Link to="/privacy">Privacy</Link>
         <Link to="/terms">Terms</Link>
+        <Link to="/data-sources">Data sources and licenses</Link>
         <Link to="/acceptable-use">Acceptable use</Link>
       </div>
     </footer>
@@ -1157,6 +1158,7 @@ function MarketingPage({ type }) {
     <>
       <PublicNav />
       <main className="marketing">
+        {type === "terms" && <p className="legalDataLink"><Link to="/data-sources">Discovery data sources and license terms</Link></p>}
         <section className="pageHero">
           <Pill tone="green">INEM ACQUIRE</Pill>
           <h1>{data[0]}</h1>
@@ -1287,6 +1289,58 @@ function Blog() {
     </section>
   );
 }
+function DataSourcesPage() {
+  return (
+    <>
+      <PublicNav />
+      <main className="marketing legalDocument">
+        <h1>Discovery data sources and licenses</h1>
+        <p>Updated 7 November 2026. This notice covers third-party data used in Inem Acquire Discovery.</p>
+        <nav aria-label="Legal documents">
+          <Link to="/terms">Terms of service</Link>
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/acceptable-use">Acceptable use</Link>
+        </nav>
+        <section>
+          <h2>Business contact information</h2>
+          <p>Discovery includes public business listings and contact details published on business websites. Listings can be incomplete, outdated or incorrectly categorized. A published contact or a working website does not establish permission to send marketing messages. Review a business before contacting it.</p>
+        </section>
+        <section>
+          <h2>Overture Maps Foundation</h2>
+          <p>Contains data from Overture Maps Foundation Places, including release 2026-10-21.0. Records may include data from Meta, Microsoft, Uberall, PinMeTo, DAC and OpenTravel under CDLA Permissive 2.0, AllThePlaces under CC0 1.0 and Foursquare under Apache 2.0.</p>
+          <p>Inem Acquire filters locations and business categories, normalizes contact fields and removes overlapping records. Contact details may be supplemented from a business website.</p>
+          <a href="https://docs.overturemaps.org/attribution/#places" target="_blank" rel="noreferrer">Overture attribution and licensing</a>
+        </section>
+        <section>
+          <h2>Foursquare Open Source Places</h2>
+          <p>Contains filtered Nigerian business records from the February 6, 2025 snapshot, mirrored by Fused on Source Cooperative. Copyright 2026 Foursquare Labs, Inc. All rights reserved. Records have been filtered, normalized and deduplicated for Discovery.</p>
+          <p><a href="/data-notices/overture/NOTICE-Foursquare.txt">Full Foursquare notice</a> · <a href="/data-notices/overture/LICENSE-Apache-2.0.txt">Apache License 2.0</a></p>
+        </section>
+        <section>
+          <h2>OpenStreetMap</h2>
+          <p>© OpenStreetMap contributors. OpenStreetMap data is available under the Open Database License. Live searches may query OpenStreetMap through Overpass. This service filters the returned records and may supplement contact details from business websites.</p>
+          <p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap copyright and attribution</a> · <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noreferrer">Open Database License 1.0</a></p>
+        </section>
+        <section>
+          <h2>Wikidata</h2>
+          <p>Live business research may include Wikidata structured data, available under CC0. Matching and filtering are performed by Inem Acquire.</p>
+          <a href="https://www.wikidata.org/wiki/Wikidata:Licensing" target="_blank" rel="noreferrer">Wikidata licensing</a>
+        </section>
+        <section>
+          <h2>License documents</h2>
+          <ul>
+            <li><a href="/data-notices/overture/NOTICE.txt">Catalog notices</a></li>
+            <li><a href="/data-notices/overture/LICENSE-CDLA-Permissive-2.0.txt">Community Data License Agreement Permissive 2.0</a></li>
+            <li><a href="/data-notices/overture/LICENSE-CC0-1.0.txt">CC0 1.0</a></li>
+            <li><a href="/data-notices/overture/LICENSE-Apache-2.0.txt">Apache License 2.0</a></li>
+          </ul>
+        </section>
+      </main>
+      <PublicFooter />
+    </>
+  );
+}
+
 function ContactPage() {
   return (
     <>
@@ -1314,6 +1368,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
+      <Route path="/data-sources" element={<DataSourcesPage />} />
       {routes.public.slice(1).map((p) => (
         <Route
           key={p}

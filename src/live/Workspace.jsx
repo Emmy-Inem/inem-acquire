@@ -298,7 +298,8 @@ export function LiveWorkspace() {
   useDialogFocus(mobile && compact, () => setMobile(false), navigationRef);
   useEffect(() => {
     setMobile(false);
-  }, [section, compact]);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [section, compact, organization?.id]);
   const role = organization?.role;
   const support = organization?.support;
   const write = !!support || canRole(role, "write"),
@@ -422,6 +423,7 @@ export function LiveWorkspace() {
           {!support && <NavLink to="/app/settings">
             <Settings /> Settings
           </NavLink>}
+          <Link className="workspaceLegalLink" to="/data-sources">Legal and data terms</Link>
           <div className="userChip">
             <span className="avatar">{initials}</span>
             <span>

@@ -965,3 +965,55 @@
 @media (max-width: 640px) {
   .leadCatalogControls .leadCatalogPager { margin-left: 0; }
 }
+
+/* Compact workspace spacing and keep the result position below the header. */
+.appShell .appTop { background: #fff; }
+.appShell .appMain { padding: 24px; }
+.appShell .pageHeader { margin-bottom: 18px; gap: 16px; }
+.appShell .livePanel { padding: 20px; margin-block: 16px; }
+.appShell .livePanel h2 { margin: 0 0 10px; }
+.appShell .findingGrid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 14px;
+}
+.appShell .finding { padding: 20px; }
+.appShell .finding > span:not(.pill) { margin: 0 0 12px; }
+.appShell .finding h2 { margin: 0 0 10px; }
+.appShell .finding p { min-height: 0; margin-bottom: 12px; }
+.appShell .leadTable { min-width: 0; table-layout: fixed; }
+.appShell .leadTable th:first-child { width: 23%; }
+.appShell .leadTable th:nth-child(2) { width: 22%; }
+.appShell .leadTable th:nth-child(3) { width: 18%; }
+.appShell .leadTable th:nth-child(4) { width: 22%; }
+.appShell .leadTable th:nth-child(5) { width: 15%; }
+.appShell .leadTable th { white-space: normal; }
+.appShell .leadTable td { min-width: 0; padding: 12px; }
+.appShell .leadTable tr { height: auto; }
+.appShell .leadActions button { white-space: normal; }
+.appShell .leadResultToolbar { margin-block: 14px 10px; }
+.leadResultsStart { scroll-margin-top: 88px; }
+.appShell .workspaceLegalLink {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding-inline: 10px;
+  font-size: 11px;
+  color: #5b6b84;
+}
+.appShell .sideTop { padding-bottom: 16px; }
+.appShell .createWorkspaceLink { padding-block: 8px; margin-block: 2px 6px; }
+.appShell .navGroup { margin-bottom: 12px; }
+.legalDocument { max-width: 850px; padding: 140px 24px 60px; margin-inline: auto; }
+.legalDocument h1 { font-size: clamp(28px, 4vw, 42px); }
+.legalDocument h2 { font-size: 21px; margin-bottom: 12px; }
+.legalDocument p, .legalDocument li { color: #465977; line-height: 1.8; }
+.legalDocument section { border-top: 1px solid #dce4ee; padding-top: 22px; margin-top: 26px; }
+.legalDocument a, .legalDataLink a { color: #0757f6; text-decoration: underline; text-underline-offset: 3px; }
+.legalDocument nav { display: flex; gap: 18px; flex-wrap: wrap; }
+.legalDataLink { max-width: 850px; padding: 120px 24px 0; margin-inline: auto; }
+@media (max-width: 600px) {
+  .appShell .appMain { padding: 18px 12px; }
+  .appShell .leadTable td { padding: 0; }
+  .appShell .leadTable td:first-child { padding: 0 0 4px; }
+  .appShell .leadTable tr { padding: 14px 0; }
+}

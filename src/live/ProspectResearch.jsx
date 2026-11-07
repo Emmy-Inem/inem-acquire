@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { industries } from "../../shared/research";
 import { api } from "./api";
@@ -103,6 +104,8 @@ export default function ProspectResearch({ onSaved }) {
   const [notice, setNotice] = useState("");
   const [contactsOnly, setContactsOnly] = useState(false);
   const controller = useRef(null);
+  const resultTop = useRef(null);
+  const scrollAfterPage = useRef(false);
   useEffect(() => () => controller.current?.abort(), []);
 
   function request(path, body, signal) {
@@ -174,13 +177,13 @@ export default function ProspectResearch({ onSaved }) {
       setNotice(
         result.outside
           ? result.companies.length
-            ? (result.geminiUsed ? "Gemini expanded your search. " : "") +
+            ? (result.geminiUsed ? "Expanded your search. " : "") +
               (result.snapshot ? "Showing additional Overture business websites." : "Showing new matches from public directories.") +
               (result.partial ? " Some live sources were unavailable." : "")
             : "No additional matches from the available directories. Try another business keyword or location."
           : result.companies.length
           ? result.ranked
-            ? "Gemini prioritized the matching categories."
+            ? "Matching categories prioritized."
             : ""
           : "No companies matched. Try a nearby city or another industry.",
       );
@@ -221,6 +224,7 @@ export default function ProspectResearch({ onSaved }) {
   }
 
   function goToPage(page) {
+    scrollAfterPage.current = true;
     searchDirectory({ ...catalogPage.query, page }, true);
   }
 
@@ -262,6 +266,16 @@ export default function ProspectResearch({ onSaved }) {
       setError("Enter valid public website addresses.");
     }
   }
+
+  useEffect(() => {
+    if (phase || !scrollAfterPage.current) return;
+    scrollAfterPage.current = false;
+    if (error) return;
+    resultTop.current?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    });
+  }, [phase, error, catalogPage?.query.page]);
 
   const complete = rows.filter((row) => checked[rowKey(row)]).length;
   const withContacts = rows.filter((row) => {
@@ -345,7 +359,7 @@ export default function ProspectResearch({ onSaved }) {
       </form>
       <div className="leadBeyondCatalog">
         <button type="button" className="btn secondary" disabled={!!phase} onClick={searchBeyondCatalog}>
-          Search beyond catalog with Gemini
+          Search beyond catalog
         </button>
         <p>Enter a location and a business keyword or industry to look in live public directories.</p>
       </div>
@@ -373,7 +387,7 @@ export default function ProspectResearch({ onSaved }) {
           {error}
         </p>
       )}
-      <div className="leadResultToolbar">
+      <div ref={resultTop} className="leadResultToolbar leadResultsStart">
         <p role="status">
           {catalogPage
             ? rows.length
@@ -482,27 +496,7 @@ export default function ProspectResearch({ onSaved }) {
                               {new URL(row.website).hostname}
                             </a>
                           )}
-                          <details className="leadEvidenceLinks">
-                            <summary>Sources</summary>
-                            <a href={row.source_url} target="_blank" rel="noreferrer">
-                              {row.release ? row.directory + " · " + row.release : "Company listing"}
-                            </a>
-                            {row.emailEvidence && <a href={row.emailEvidence} target="_blank" rel="noreferrer">Published email source</a>}
-                            {row.phoneEvidence && <a href={row.phoneEvidence} target="_blank" rel="noreferrer">Published phone source</a>}
-                            {row.contactCheckedAt && <small>Website checked {new Date(row.contactCheckedAt).toLocaleDateString()}</small>}
-                            {info.pages
-                              .filter((page) => page.source !== row.source_url)
-                              .map((page, index) => (
-                                <a
-                                  key={page.source}
-                                  href={page.source}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  Website page {index + 1}
-                                </a>
-                              ))}
-                          </details>
+
                         </td>
                         <td data-label="Business email">
                           <ContactColumn
@@ -652,24 +646,7 @@ export default function ProspectResearch({ onSaved }) {
           {catalogPage && (
             <CatalogPager {...catalogPage} busy={!!phase} onPage={goToPage} placement="Bottom" />
           )}
-          {shown.some((row) => row.catalog || row.directory === "Overture") && (
-            <p className="leadCredit">
-              Catalog sources include Overture Maps Foundation and Foursquare Open Source Places.{" "}
-              <a href="/data-notices/overture/NOTICE.txt" target="_blank" rel="noreferrer">Source and license notices</a>
-            </p>
-          )}
-          {shown.some((row) => row.directory === "OpenStreetMap") && (
-            <p className="leadCredit">
-              <a
-                href="https://www.openstreetmap.org/copyright"
-                target="_blank"
-                rel="noreferrer"
-              >
-                © OpenStreetMap contributors
-              </a>{" "}
-              · ODbL
-            </p>
-          )}
+          <p className="leadCredit"><Link to="/data-sources">Data licenses and terms</Link></p>
         </>
       )}
     </section>
