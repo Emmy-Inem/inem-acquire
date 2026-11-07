@@ -1,3 +1,4 @@
+import { CompanyPhoto, CompanyDocuments } from "./CompanyAssets";
 import { useDialogFocus } from "./useDialogFocus";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useMediaQuery } from "../useMediaQuery";
@@ -48,6 +49,7 @@ import WorkspaceGuide from "./WorkspaceGuide";
 import { toLocalDateTime } from "./dateTime";
 import { assignableRoles, canManageMember } from "../../shared/permissions";
 
+const SalesAdvisor = React.lazy(() => import("./SalesAdvisor"));
 const ProspectResearch = React.lazy(() => import("./ProspectResearch"));
 
 const navigation = [
@@ -95,13 +97,15 @@ const modules = {
       ["name", "Offer name", "text", true],
       ["description", "Description", "textarea"],
       ["price", "Price", "number"],
+      ["status", "Offer status", "select", ["active", "archived"]],
       ["currency", "Currency", "currency"],
     ],
-    columns: ["name", "description", "price", "currency"],
+    columns: ["name", "description", "price", "currency", "status"],
   },
   icps: {
     title: "Ideal customers",
-    description: "Define who gets the most value from your offer.",
+    description:
+      "Describe your target industries, locations and buyer roles. These profiles guide research; contacts are the actual people or business inboxes you save.",
     fields: [
       ["name", "Profile name", "text", true],
       ["offer_id", "Offer", "offers"],
@@ -121,6 +125,8 @@ const modules = {
       ["website", "Website", "url"],
       ["industry", "Industry", "text"],
       ["country", "Country", "text"],
+      ["email", "Business email", "email"],
+      ["phone", "Business phone", "tel"],
       ["source_url", "Research source URL", "url"],
       ["fit_score", "Fit score (0–100)", "number"],
       ["notes", "Research notes", "textarea"],
@@ -136,11 +142,13 @@ const modules = {
   contacts: {
     title: "Contacts",
     description:
-      "Keep people and permission to contact them connected to your research.",
+      "People and business inboxes you can contact. Link each contact to a saved business, then organize it into outreach lists.",
     fields: [
-      ["full_name", "Full name", "text", true],
+      ["full_name", "Full name or business inbox", "text", true],
+      ["phone", "Phone number", "tel"],
       ["email", "Email", "email"],
       ["job_title", "Job title", "text"],
+      ["notes", "Notes", "textarea"],
       ["prospect_id", "Company", "prospects"],
       [
         "consent_status",
@@ -153,7 +161,8 @@ const modules = {
   },
   lists: {
     title: "Lists",
-    description: "Organize contacts into focused working sets.",
+    description:
+      "Group saved contacts into an outreach audience. Add a list, then choose Contacts to select its members.",
     fields: [
       ["name", "List name", "text", true],
       ["description", "Description", "textarea"],
@@ -208,6 +217,13 @@ const modules = {
     description: "Save report definitions and export your workspace data.",
     fields: [
       ["name", "Report name", "text", true],
+      [
+        "report_module",
+        "Report data",
+        "select",
+        ["prospects", "contacts", "deals", "tasks"],
+      ],
+      ["report_columns", "Columns to include", "report_columns"],
       ["description", "What should this report show?", "textarea"],
     ],
     columns: ["name", "definition", "created_at"],
@@ -307,7 +323,10 @@ export function LiveWorkspace() {
     approve = canRole(role, "approve"),
     manage = canRole(role, "manage");
   if (section === "admin") return <Navigate to="/platform" replace />;
-  if (support && ["settings", "team", "integrations", "billing", "audit"].includes(section))
+  if (
+    support &&
+    ["settings", "team", "integrations", "billing", "audit"].includes(section)
+  )
     return <Navigate to={workspaceBase + "/dashboard"} replace />;
   if (!organization)
     return session.platformOwner ? (
@@ -343,32 +362,35 @@ export function LiveWorkspace() {
           </button>
         </div>
         {support ? (
-          <div className="workspace liveWorkspaceSelect"><Building2 size={20} /><strong>{organization.name}</strong></div>
+          <div className="workspace liveWorkspaceSelect">
+            <Building2 size={20} />
+            <strong>{organization.name}</strong>
+          </div>
         ) : (
-        <>
-        <label className="workspace liveWorkspaceSelect">
-          <Building2 size={20} />
-          <select
-            aria-label="Organization"
-            value={organization?.id || ""}
-            onChange={(e) => {
-              selectOrganization(e.target.value);
-              setMobile(false);
-            }}
-          >
-            {!organization && <option value="">Select organization</option>}
-            {organizations.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Link className="createWorkspaceLink" to="/onboarding/welcome">
-          <Plus size={16} />
-          Create organization
-        </Link>
-        </>
+          <>
+            <label className="workspace liveWorkspaceSelect">
+              <Building2 size={20} />
+              <select
+                aria-label="Organization"
+                value={organization?.id || ""}
+                onChange={(e) => {
+                  selectOrganization(e.target.value);
+                  setMobile(false);
+                }}
+              >
+                {!organization && <option value="">Select organization</option>}
+                {organizations.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Link className="createWorkspaceLink" to="/onboarding/welcome">
+              <Plus size={16} />
+              Create organization
+            </Link>
+          </>
         )}
         {session.platformOwner && (
           <Link className="createWorkspaceLink platformShortcut" to="/platform">
@@ -400,20 +422,22 @@ export function LiveWorkspace() {
                 Audit trail
               </NavLink>
             )}
-            {!support && <>
-            <NavLink to="/app/team">
-              <Users />
-              Team & roles
-            </NavLink>
-            <NavLink to="/app/integrations">
-              <Settings />
-              Integrations
-            </NavLink>
-            <NavLink to="/app/billing">
-              <BriefcaseBusiness />
-              Billing
-            </NavLink>
-            </>}
+            {!support && (
+              <>
+                <NavLink to="/app/team">
+                  <Users />
+                  Team & roles
+                </NavLink>
+                <NavLink to="/app/integrations">
+                  <Settings />
+                  Integrations
+                </NavLink>
+                <NavLink to="/app/billing">
+                  <BriefcaseBusiness />
+                  Billing
+                </NavLink>
+              </>
+            )}
             <NavLink to={workspaceBase + "/guide"}>
               <Lightbulb />
               Workspace guide
@@ -421,10 +445,14 @@ export function LiveWorkspace() {
           </div>
         </nav>
         <div className="sideBottom">
-          {!support && <NavLink to="/app/settings">
-            <Settings /> Settings
-          </NavLink>}
-          <Link className="workspaceLegalLink" to="/data-sources">Legal and data terms</Link>
+          {!support && (
+            <NavLink to="/app/settings">
+              <Settings /> Settings
+            </NavLink>
+          )}
+          <Link className="workspaceLegalLink" to="/data-sources">
+            Legal and data terms
+          </Link>
           <div className="userChip">
             <span className="avatar">{initials}</span>
             <span>
@@ -463,13 +491,15 @@ export function LiveWorkspace() {
               <Lightbulb size={18} />
               <span>Guide</span>
             </Link>
-            {!support && <Link
-              className="workspaceAccount"
-              to="/app/settings"
-              aria-label="Your account and settings"
-            >
-              <span className="avatar">{initials}</span>
-            </Link>}
+            {!support && (
+              <Link
+                className="workspaceAccount"
+                to="/app/settings"
+                aria-label="Your account and settings"
+              >
+                <span className="avatar">{initials}</span>
+              </Link>
+            )}
           </div>
         </header>
         {shellError && (
@@ -483,7 +513,10 @@ export function LiveWorkspace() {
             <span>
               Support workspace · {organization.name} · expires{" "}
               {new Date(organization.support.expires_at).toLocaleTimeString()}
-              <small>{organization.support.reason} · Organization administration and approvals are restricted.</small>
+              <small>
+                {organization.support.reason} · Organization administration and
+                approvals are restricted.
+              </small>
             </span>
             <button
               disabled={endingSupport}
@@ -514,6 +547,8 @@ export function LiveWorkspace() {
         >
           {section === "dashboard" || section === "analytics" ? (
             <Overview analytics={section === "analytics"} {...props} />
+          ) : section === "tasks" ? (
+            <TasksPage {...props} />
           ) : section === "diagnosis" ? (
             <DiagnosisPage {...props} />
           ) : section === "pipeline" ? (
@@ -540,7 +575,15 @@ export function LiveWorkspace() {
           ) : section === "inbox" ? (
             <InboxView />
           ) : section === "ai-advisor" ? (
-            <AdvisorPage />
+            <React.Suspense
+              fallback={
+                <p className="liveState" role="status">
+                  Opening Sales advisor…
+                </p>
+              }
+            >
+              <SalesAdvisor />
+            </React.Suspense>
           ) : modules[section === "ideal-customers" ? "icps" : section] ? (
             <ResourcePage
               resource={section === "ideal-customers" ? "icps" : section}
@@ -575,14 +618,18 @@ function Header({ title, description, children }) {
     </div>
   );
 }
-function RecordForm({ resource, record, onClose, onSaved }) {
+function RecordForm({ resource, record, initialValues, onClose, onSaved }) {
   const config = modules[resource],
     request = useOrgApi();
   const [values, setValues] = useState(() => {
-      const v = { ...record };
+      const v = { ...(record || initialValues) };
       if (resource === "icps") Object.assign(v, record?.criteria || {});
       if (resource === "reports")
         v.description = record?.definition?.description || "";
+      if (resource === "reports") {
+        v.report_module = record?.definition?.resource || "prospects";
+        v.report_columns = record?.definition?.columns || "";
+      }
       if (v.due_at) v.due_at = toLocalDateTime(v.due_at);
       return v;
     }),
@@ -631,7 +678,10 @@ function RecordForm({ resource, record, onClose, onSaved }) {
       >
         <header>
           <h2 id="record-form-title">
-            {record ? "Edit" : "Add"} {resource === "icps" ? "ideal customer profile" : resource.slice(0, -1)}
+            {record ? "Edit" : "Add"}{" "}
+            {resource === "icps"
+              ? "ideal customer profile"
+              : resource.slice(0, -1)}
           </h2>
           <button
             aria-label="Close dialog"
@@ -681,7 +731,13 @@ function RecordForm({ resource, record, onClose, onSaved }) {
                 delete data.job_titles;
               }
               if (resource === "reports") {
-                data.definition = { description: data.description || "" };
+                data.definition = {
+                  description: data.description || "",
+                  resource: data.report_module || "prospects",
+                  columns: data.report_columns || "",
+                };
+                delete data.report_module;
+                delete data.report_columns;
                 delete data.description;
               }
               if (resource === "prospects")
@@ -707,14 +763,91 @@ function RecordForm({ resource, record, onClose, onSaved }) {
           {config.fields.map(([key, label, type, requiredOrOptions]) => (
             <label className="field" key={key}>
               <span>{label}</span>
-              {type === "textarea" ? (
+              {type === "report_columns" ? (
+                <select
+                  multiple
+                  size={5}
+                  aria-label={label}
+                  value={
+                    values.report_columns
+                      ? values.report_columns.split(",")
+                      : {
+                          prospects: [
+                            "name",
+                            "email",
+                            "phone",
+                            "industry",
+                            "country",
+                          ],
+                          contacts: [
+                            "full_name",
+                            "email",
+                            "phone",
+                            "job_title",
+                            "consent_status",
+                          ],
+                          deals: [
+                            "title",
+                            "value",
+                            "currency",
+                            "stage",
+                            "expected_close",
+                          ],
+                          tasks: ["title", "status", "priority", "due_at"],
+                        }[values.report_module || "prospects"]
+                  }
+                  onChange={(e) =>
+                    setValues({
+                      ...values,
+                      report_columns: [...e.target.selectedOptions]
+                        .map((o) => o.value)
+                        .join(","),
+                    })
+                  }
+                >
+                  {{
+                    prospects: [
+                      "name",
+                      "email",
+                      "phone",
+                      "industry",
+                      "country",
+                    ],
+                    contacts: [
+                      "full_name",
+                      "email",
+                      "phone",
+                      "job_title",
+                      "consent_status",
+                    ],
+                    deals: [
+                      "title",
+                      "value",
+                      "currency",
+                      "stage",
+                      "expected_close",
+                    ],
+                    tasks: ["title", "status", "priority", "due_at"],
+                  }[values.report_module || "prospects"].map((field) => (
+                    <option key={field} value={field}>
+                      {titleCase(field)}
+                    </option>
+                  ))}
+                </select>
+              ) : type === "textarea" ? (
                 <textarea
                   autoFocus={key === config.fields[0][0]}
                   required={requiredOrOptions === true}
                   maxLength={20000}
                   value={values[key] || ""}
                   onChange={(e) =>
-                    setValues({ ...values, [key]: e.target.value })
+                    setValues({
+                      ...values,
+                      [key]: e.target.value,
+                      ...(key === "report_module"
+                        ? { report_columns: "" }
+                        : {}),
+                    })
                   }
                 />
               ) : type === "select" ? (
@@ -807,6 +940,7 @@ function ResourcePage({ resource, write, approve }) {
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [editing, setEditing] = useState(null),
+    [relatedDraft, setRelatedDraft] = useState(null),
     [notice, setNotice] = useState(""),
     [deleting, setDeleting] = useState(""),
     [selected, setSelected] = useState(""),
@@ -862,15 +996,24 @@ function ResourcePage({ resource, write, approve }) {
       setActionPending(false);
     }
   };
-  const exportData = async () => {
+  const exportData = async (report) => {
+    const target = report?.definition?.resource || resource;
+    const fields = report?.definition?.columns;
     try {
-      const response = await fetch("/api/export/" + resource, {
-        credentials: "same-origin",
-        headers: {
-          "x-organization-id": organization.id,
-          ...(organization.support ? { "x-support-session-id": organization.support.id } : {}),
+      const response = await fetch(
+        "/api/export/" +
+          target +
+          (fields ? "?fields=" + encodeURIComponent(fields) : ""),
+        {
+          credentials: "same-origin",
+          headers: {
+            "x-organization-id": organization.id,
+            ...(organization.support
+              ? { "x-support-session-id": organization.support.id }
+              : {}),
+          },
         },
-      });
+      );
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error);
@@ -878,7 +1021,7 @@ function ResourcePage({ resource, write, approve }) {
       const objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
       link.href = objectUrl;
-      link.download = resource + ".csv";
+      link.download = (report?.name || target) + ".csv";
       link.click();
       URL.revokeObjectURL(objectUrl);
     } catch (e) {
@@ -931,12 +1074,39 @@ function ResourcePage({ resource, write, approve }) {
             </button>
           </div>
           <div hidden={showRecords}>
-            <React.Suspense fallback={<p className="liveState" role="status">Opening Discovery…</p>}>
+            <React.Suspense
+              fallback={
+                <p className="liveState" role="status">
+                  Opening Discovery…
+                </p>
+              }
+            >
               <ProspectResearch onSaved={load} />
             </React.Suspense>
           </div>
         </>
       )}
+      <div className="workflowHelp">
+        <p>
+          {
+            {
+              icps: "Customer profiles describe the businesses and buyer roles you want to target. They guide Discovery; they are not a list of people.",
+              contacts:
+                "Contacts are people or business inboxes. Lists organize those contacts into an audience; deals track a qualified sales opportunity.",
+              lists:
+                "A list is a reusable audience of contacts. Open Contacts on a list to add or remove people, then use it when preparing outreach.",
+              deals:
+                "A deal is a qualified sales opportunity with a value and stage. Link it to a saved business, then schedule a task for its next step.",
+              prospects:
+                "Discovery finds businesses. Save a business, then create its contact or a qualified deal from Saved prospects.",
+              offers:
+                "An offer describes the result you sell and its price. Link a customer profile to the offer to focus your research.",
+              campaigns:
+                "Prepare a message, select opted-in contacts, then request approval. Sending requires a connected email service.",
+            }[resource]
+          }
+        </p>
+      </div>
       <div hidden={!showRecords}>
         {canResearch && (
           <div className="resourceTools">
@@ -996,7 +1166,9 @@ function ResourcePage({ resource, write, approve }) {
                   {rows.map((row) => (
                     <tr key={row.id}>
                       {config.columns.map((column) => (
-                        <td key={column} data-label={titleCase(column)}>{display(row[column], column)}</td>
+                        <td key={column} data-label={titleCase(column)}>
+                          {display(row[column], column)}
+                        </td>
                       ))}
                       <td className="resourceActionCell">
                         <div className="liveRowActions">
@@ -1012,6 +1184,47 @@ function ResourcePage({ resource, write, approve }) {
                                 Delete
                               </button>
                             )}
+                          {resource === "reports" && approve && (
+                            <button onClick={() => exportData(row)}>
+                              Download report
+                            </button>
+                          )}
+                          {resource === "prospects" && write && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  setRelatedDraft({
+                                    resource: "contacts",
+                                    values: {
+                                      full_name: row.name + " team",
+                                      prospect_id: row.id,
+                                      email: row.email || null,
+                                      phone: row.phone || null,
+                                      consent_status: "unknown",
+                                    },
+                                  })
+                                }
+                              >
+                                Create contact
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setRelatedDraft({
+                                    resource: "deals",
+                                    values: {
+                                      title: row.name + " opportunity",
+                                      prospect_id: row.id,
+                                      value: 0,
+                                      currency: "NGN",
+                                      stage: "qualified",
+                                    },
+                                  })
+                                }
+                              >
+                                Create deal
+                              </button>
+                            </>
+                          )}
                           {resource === "campaigns" && (
                             <>
                               {
@@ -1052,7 +1265,9 @@ function ResourcePage({ resource, write, approve }) {
             </div>
           </State>
           <div className="pagination">
-            <span>{count} {count === 1 ? "record" : "records"}</span>
+            <span>
+              {count} {count === 1 ? "record" : "records"}
+            </span>
             <div>
               <button
                 disabled={!offset || loading}
@@ -1079,6 +1294,21 @@ function ResourcePage({ resource, write, approve }) {
             setEditing(null);
             setNotice("Record saved.");
             load();
+          }}
+        />
+      )}
+      {relatedDraft && (
+        <RecordForm
+          resource={relatedDraft.resource}
+          initialValues={relatedDraft.values}
+          onClose={() => setRelatedDraft(null)}
+          onSaved={() => {
+            setNotice(
+              relatedDraft.resource === "contacts"
+                ? "Contact saved. Find it on the Contacts page, then add it to an outreach list."
+                : "Deal created. Find it in Deals or Pipeline and schedule its next follow-up.",
+            );
+            setRelatedDraft(null);
           }}
         />
       )}
@@ -1757,7 +1987,8 @@ function DiagnosisPage({ write }) {
                   <p>{f.detail}</p>
                   <Link
                     to={
-                      workspaceBase + "/" +
+                      workspaceBase +
+                      "/" +
                       (f.source === "icps" ? "ideal-customers" : f.source)
                     }
                   >
@@ -1797,6 +2028,253 @@ function DiagnosisPage({ write }) {
     </>
   );
 }
+function TasksPage({ write, approve }) {
+  const request = useOrgApi(),
+    { workspaceBase } = useAuth();
+  const [rows, setRows] = useState([]),
+    [deals, setDeals] = useState([]),
+    [filter, setFilter] = useState("open"),
+    [search, setSearch] = useState(""),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState(""),
+    [editing, setEditing] = useState(null),
+    [busy, setBusy] = useState(""),
+    [deleting, setDeleting] = useState(null);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [tasks, opportunities] = await Promise.all([
+        readAllRecords(request, "tasks"),
+        readAllRecords(request, "deals"),
+      ]);
+      setRows(tasks);
+      setDeals(opportunities);
+      setError("");
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [request]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  const today = new Date().toDateString(),
+    now = Date.now();
+  const matches = {
+    all: () => true,
+    open: (t) => t.status !== "done",
+    overdue: (t) =>
+      t.status !== "done" && t.due_at && new Date(t.due_at).getTime() < now,
+    today: (t) =>
+      t.status !== "done" &&
+      t.due_at &&
+      new Date(t.due_at).toDateString() === today,
+    done: (t) => t.status === "done",
+  };
+  const shown = rows
+    .filter(matches[filter])
+    .filter((t) => t.title.toLowerCase().includes(search.toLowerCase()))
+    .sort(
+      (a, b) =>
+        Number(a.status === "done") - Number(b.status === "done") ||
+        new Date(a.due_at || "2099-01-01") - new Date(b.due_at || "2099-01-01"),
+    );
+  return (
+    <>
+      <Header
+        title="Tasks & follow-ups"
+        description="Every opportunity needs a next step. Set a due date, assign an owner and keep follow-ups moving."
+      >
+        {write && (
+          <button
+            className="btn primary"
+            onClick={() => setEditing({ new: true })}
+          >
+            <Plus size={16} />
+            Add task
+          </button>
+        )}
+      </Header>
+      <div className="taskFilters" role="group" aria-label="Task views">
+        {[
+          ["open", "Open"],
+          ["today", "Due today"],
+          ["overdue", "Overdue"],
+          ["done", "Completed"],
+          ["all", "All tasks"],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            aria-pressed={filter === id}
+            onClick={() => setFilter(id)}
+          >
+            {label}
+            <span>{rows.filter(matches[id]).length}</span>
+          </button>
+        ))}
+      </div>
+      <label className="field taskSearch">
+        <span>Find a task</span>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search follow-ups…"
+        />
+      </label>
+      {error && (
+        <p role="alert" className="liveError">
+          {error}
+        </p>
+      )}
+      <State loading={loading} error={error} retry={load}>
+        {shown.length ? (
+          <div className="taskBoard">
+            {shown.map((task) => {
+              const deal = deals.find((d) => d.id === task.deal_id),
+                overdue = matches.overdue(task);
+              return (
+                <article
+                  className={
+                    "panel taskItem " +
+                    (task.status === "done" ? "completed" : "")
+                  }
+                  key={task.id}
+                >
+                  {write && (
+                    <button
+                      className="taskComplete"
+                      disabled={!!busy}
+                      aria-label={
+                        (task.status === "done" ? "Reopen " : "Complete ") +
+                        task.title
+                      }
+                      onClick={async () => {
+                        setBusy(task.id);
+                        try {
+                          await request("/resources/tasks/" + task.id, {
+                            method: "PATCH",
+                            body: {
+                              status: task.status === "done" ? "open" : "done",
+                            },
+                          });
+                          await load();
+                        } catch (e) {
+                          setError(e.message);
+                        } finally {
+                          setBusy("");
+                        }
+                      }}
+                    >
+                      {task.status === "done" ? <Check size={19} /> : <span />}
+                    </button>
+                  )}
+                  <div className="taskBody">
+                    <h2>{task.title}</h2>
+                    <p className={overdue ? "taskOverdue" : ""}>
+                      {task.due_at
+                        ? (overdue ? "Overdue · " : "Due ") +
+                          new Date(task.due_at).toLocaleString([], {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })
+                        : "No due date — add one to keep this follow-up visible."}
+                    </p>
+                    <small>
+                      {titleCase(task.priority)} priority
+                      {deal ? " · " + deal.title : ""}
+                    </small>
+                  </div>
+                  <div className="assetActions">
+                    {write && (
+                      <button
+                        className="btn secondary"
+                        onClick={() => setEditing(task)}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {approve && (
+                      <button
+                        className="btn secondary"
+                        onClick={() => setDeleting(task)}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <section className="panel livePanel taskEmpty">
+            <h2>
+              {filter === "overdue"
+                ? "No overdue follow-ups"
+                : filter === "today"
+                  ? "Nothing due today"
+                  : filter === "done"
+                    ? "No completed tasks yet"
+                    : "Your next step starts here"}
+            </h2>
+            <p>
+              {filter === "overdue"
+                ? "Keep your open tasks dated so opportunities stay on track."
+                : "Try a different view, or add a specific action such as calling a prospect or sending a proposal."}
+            </p>
+            {write && (
+              <button
+                className="btn primary"
+                onClick={() => setEditing({ new: true })}
+              >
+                Add a follow-up
+              </button>
+            )}
+            <Link to={workspaceBase + "/deals"}>
+              Review deals <ArrowRight size={14} />
+            </Link>
+          </section>
+        )}
+      </State>
+      {editing && (
+        <RecordForm
+          resource="tasks"
+          record={editing.new ? null : editing}
+          initialValues={
+            editing.new ? { priority: "medium", status: "open" } : undefined
+          }
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
+      {deleting && (
+        <Confirm
+          title="Delete this task?"
+          detail={deleting.title}
+          onCancel={() => setDeleting(null)}
+          onConfirm={async () => {
+            try {
+              await request("/resources/tasks/" + deleting.id, {
+                method: "DELETE",
+              });
+              setDeleting(null);
+              load();
+            } catch (e) {
+              setError(e.message);
+              setDeleting(null);
+            }
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 function CompanyPage({ manage, write, embedded = false }) {
   const { organization, refresh } = useAuth();
   const request = useOrgApi(),
@@ -1811,6 +2289,7 @@ function CompanyPage({ manage, write, embedded = false }) {
           description="Keep the company context behind your acquisition process accurate."
         />
       )}
+      <CompanyPhoto manage={manage} />
       <form
         className="panel settingsForm"
         onSubmit={async (e) => {
@@ -1876,7 +2355,7 @@ function CompanyPage({ manage, write, embedded = false }) {
           </button>
         )}
       </form>
-      <DocumentPanel manage={write} />
+      <CompanyDocuments manage={write} />
     </>
   );
 }
@@ -1950,6 +2429,46 @@ function TeamPage({ manage }) {
           ))}
         </section>
       </State>
+      {memberManagement &&
+        !!data?.invitations?.filter(
+          (i) => !i.accepted_at && new Date(i.expires_at) > new Date(),
+        ).length && (
+          <section className="panel livePanel">
+            <h2>Pending invitations</h2>
+            {data.invitations
+              .filter(
+                (i) => !i.accepted_at && new Date(i.expires_at) > new Date(),
+              )
+              .map((i) => (
+                <div className="companyFile" key={i.id}>
+                  <span>
+                    {i.email} · {titleCase(i.role)}
+                  </span>
+                  {(i.role !== "admin" || organization.role === "owner") && (
+                    <button
+                      className="btn secondary"
+                      disabled={pending}
+                      onClick={async () => {
+                        setPending(true);
+                        try {
+                          await request("/invitations/" + i.id, {
+                            method: "DELETE",
+                          });
+                          await load();
+                        } catch (e) {
+                          setError(e.message);
+                        } finally {
+                          setPending(false);
+                        }
+                      }}
+                    >
+                      Revoke invitation
+                    </button>
+                  )}
+                </div>
+              ))}
+          </section>
+        )}
       {memberManagement && (
         <form
           className="panel livePanel"
@@ -2019,9 +2538,10 @@ function ConnectionsPage({ section, manage }) {
         section === "billing"
           ? request("/resources/billing_accounts")
           : Promise.resolve(null),
+        request("/research-usage"),
       ])
-        .then(([providers, accounts]) => {
-          setData({ ...providers, accounts: accounts?.data });
+        .then(([providers, accounts, usage]) => {
+          setData({ ...providers, accounts: accounts?.data, usage });
           setError("");
         })
         .catch((e) => setError(e.message)),
@@ -2045,6 +2565,16 @@ function ConnectionsPage({ section, manage }) {
           {section === "billing" ? (
             <>
               <h2>{titleCase(data?.accounts?.[0]?.plan || "Starter")}</h2>
+              <p>
+                <strong>{data?.usage?.remaining ?? "—"}</strong> of{" "}
+                {data?.usage?.limit ?? "—"} research credits remaining this
+                month.
+              </p>
+              <p>
+                One credit researches one business website. Browsing the shared
+                catalog is free of research charges. Credits reset each calendar
+                month.
+              </p>
               <p>
                 Status:{" "}
                 {titleCase(data?.accounts?.[0]?.status || "Not configured")}
@@ -2090,7 +2620,7 @@ function ConnectionsPage({ section, manage }) {
                   <small>
                     {p.provider === "gemini"
                       ? p.configured
-                        ? "Key configured for prospect ranking and sales suggestions. Requests use public categories and general playbook topics."
+                        ? "AI assistance is connected for public business research, website recovery and workspace advice. Only files you attach are included in an advisor answer."
                         : "Add a Gemini API key to enable prospect ranking and sales suggestions."
                       : p.configured
                         ? "Connected and available to your workspace"
@@ -2177,175 +2707,6 @@ function InboxView() {
         </section>
       </State>
     </>
-  );
-}
-function AdvisorPage() {
-  const { workspaceBase } = useAuth();
-  const request = useOrgApi(),
-    [question, setQuestion] = useState(""),
-    [answer, setAnswer] = useState(null),
-    [pending, setPending] = useState(false),
-    [error, setError] = useState("");
-  return (
-    <>
-      <Header
-        title="Sales advisor"
-        description="Get a grounded summary of the evidence in your workspace."
-      />
-      <form
-        className="panel livePanel"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setPending(true);
-          setError("");
-          try {
-            setAnswer(
-              await request("/advisor", { method: "POST", body: { question } }),
-            );
-          } catch (e) {
-            setError(e.message);
-          } finally {
-            setPending(false);
-          }
-        }}
-      >
-        <label className="field">
-          <span>What should the team focus on?</span>
-          <textarea
-            required
-            minLength={3}
-            maxLength={2000}
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-          />
-        </label>
-        <button className="btn primary" disabled={pending}>
-          {pending ? "Reviewing evidence…" : "Review workspace evidence"}
-        </button>
-      </form>
-      {error && (
-        <p className="liveError" role="alert">
-          {error}
-        </p>
-      )}
-      {answer && (
-        <article className="panel livePanel">
-          <h2>Your next priorities</h2>
-          <p className="liveMessageBody">{answer.answer}</p>
-          <small>Evidence review · {answer.mode}</small>
-          {!!answer.gemini_steps?.length && (
-            <>
-              <h3>Gemini suggestions</h3>
-              <ol>
-                {answer.gemini_steps.map((step, index) => (
-                  <li key={index}>{step}</li>
-                ))}
-              </ol>
-            </>
-          )}
-          <div className="liveEvidence">
-            {answer.sources.map((s, i) => (
-              <Link
-                key={i}
-                to={
-                  workspaceBase + "/" + (s.table === "icps" ? "ideal-customers" : s.table)
-                }
-              >
-                {titleCase(s.table)} · {s.ids.length} linked records
-              </Link>
-            ))}
-          </div>
-        </article>
-      )}
-    </>
-  );
-}
-function DocumentPanel({ manage }) {
-  const request = useOrgApi(),
-    { organization } = useAuth(),
-    [rows, setRows] = useState([]),
-    [message, setMessage] = useState("");
-  const load = useCallback(
-    () =>
-      request("/documents")
-        .then((r) => setRows(r.data))
-        .catch((e) => setMessage(e.message)),
-    [request],
-  );
-  useEffect(() => {
-    load();
-  }, [load]);
-  return (
-    <section className="panel livePanel">
-      <h2>Company documents</h2>
-      <p>Private PDF, text and CSV files, up to 5 MB.</p>
-      {manage && (
-        <label className="btn secondary">
-          <Upload size={15} />
-          Upload document
-          <input
-            type="file"
-            accept=".pdf,.txt,.csv"
-            hidden
-            onChange={async (e) => {
-              const file = e.target.files[0];
-              if (!file) return;
-              try {
-                if (file.size > 5 * 1024 * 1024)
-                  throw new Error("Choose a file under 5 MB");
-                const response = await fetch(
-                  "/api/documents?name=" + encodeURIComponent(file.name),
-                  {
-                    method: "POST",
-                    credentials: "same-origin",
-                    headers: {
-                      "x-organization-id": organization.id,
-                      ...(organization.support ? { "x-support-session-id": organization.support.id } : {}),
-                      "Content-Type": file.type || "text/plain",
-                    },
-                    body: file,
-                  },
-                );
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.error);
-                setMessage("Document saved.");
-                load();
-              } catch (e) {
-                setMessage(e.message);
-              } finally {
-                e.target.value = "";
-              }
-            }}
-          />
-        </label>
-      )}
-      {message && <p role="status">{message}</p>}
-      {rows.map((d) => (
-        <div className="liveMetric" key={d.id}>
-          <span>
-            {d.name}
-            <small>{Math.ceil(d.size_bytes / 1024)} KB</small>
-          </span>
-          <button
-            className="btn secondary"
-            onClick={async () => {
-              const popup = window.open("about:blank", "_blank");
-              if (popup) popup.opener = null;
-              try {
-                const r = await request("/documents/" + d.id);
-                if (popup) popup.location.replace(r.url);
-                else window.location.assign(r.url);
-              } catch (e) {
-                popup?.close();
-                setMessage(e.message);
-              }
-            }}
-          >
-            Open
-          </button>
-        </div>
-      ))}
-    </section>
   );
 }
 

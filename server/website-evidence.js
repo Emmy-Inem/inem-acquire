@@ -67,15 +67,29 @@ export function extractContacts(html, source, country) {
   const contactPoints = profiles
     .flatMap((profile) => [profile, ...asList(profile.contactPoint)])
     .filter(Boolean);
+  // Explicit business contact links and organization contact points can publish a named inbox.
+  // Plain page-body matches remain restricted to business-role inboxes.
+  const publishedEmail = (value) => {
+    const clean = String(value || "")
+      .trim()
+      .toLowerCase();
+    return /^[a-z0-9][a-z0-9._%+-]*@[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(
+      clean,
+    ) && clean.length <= 254
+      ? clean
+      : null;
+  };
   const emails = [
     ...links
       .filter((link) => /^mailto:/i.test(link))
-      .map((link) => link.slice(7).split("?")[0]),
-    ...contactPoints.flatMap((point) => strings(point.email)),
-    ...(publicText.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || []),
-  ]
-    .map(businessEmail)
-    .filter(Boolean);
+      .map((link) => publishedEmail(link.slice(7).split("?")[0])),
+    ...contactPoints
+      .flatMap((point) => strings(point.email))
+      .map(publishedEmail),
+    ...(publicText.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || []).map(
+      businessEmail,
+    ),
+  ].filter(Boolean);
   const phoneValues = [
     ...links.filter((link) => /^tel:/i.test(link)).map((link) => link.slice(4)),
     ...contactPoints.flatMap((point) => strings(point.telephone)),

@@ -1,6 +1,6 @@
 const modelName = "gemini-3.1-flash-lite";
 
-export async function askGemini(env, instruction, input, schema) {
+export async function askGemini(env, instruction, input, schema, options = {}) {
   if (!env.GEMINI_API_KEY) return null;
   const model = env.GEMINI_MODEL || modelName;
   if (!/^[a-z0-9][a-z0-9.-]{0,79}$/.test(model)) return null;
@@ -13,14 +13,21 @@ export async function askGemini(env, instruction, input, schema) {
           "Content-Type": "application/json",
           "x-goog-api-key": env.GEMINI_API_KEY,
         },
-        signal: AbortSignal.timeout(6500),
+        signal: AbortSignal.timeout(options.timeout || 6500),
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: instruction }] },
-          contents: [{ parts: [{ text: JSON.stringify(input) }] }],
+          contents: [
+            {
+              parts: [
+                { text: JSON.stringify(input) },
+                ...(options.parts || []),
+              ],
+            },
+          ],
           generationConfig: {
             responseMimeType: "application/json",
             responseJsonSchema: schema,
-            maxOutputTokens: 500,
+            maxOutputTokens: options.maxOutputTokens || 500,
             temperature: 0.2,
             thinkingConfig: { thinkingLevel: "minimal" },
           },

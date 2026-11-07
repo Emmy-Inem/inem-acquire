@@ -940,7 +940,7 @@ function OnePagePricing() {
       desc: "For larger organizations that need greater capacity, governance and support.",
       features: [
         "Flexible seats and usage",
-        "Role-based access and SSO",
+        "Role-based access; SSO scoped on request",
         "Advanced security controls",
         "Custom data integrations",
         "Dedicated onboarding",
@@ -1019,7 +1019,7 @@ function OnePagePricing() {
       </div>
       <p className="pricingNote">
         All plans include guided onboarding, data export and human approval
-        before outbound communication. Usage limits reset monthly.
+        before outbound communication. Research credits cover business website checks and reset monthly. Campaign delivery requires a connected sending service; custom SSO and integrations are scoped with your team.
       </p>
     </section>
   );
@@ -1215,54 +1215,8 @@ function FeatureBlocks({ type }) {
     </section>
   );
 }
-function Pricing() {
-  return (
-    <section className="pricingGrid">
-      {[
-        [
-          "Foundation",
-          "₦95,000",
-          "For small teams building their first repeatable system.",
-        ],
-        [
-          "Growth",
-          "₦275,000",
-          "For teams ready to scale research, campaigns and reporting.",
-        ],
-        [
-          "Scale",
-          "Custom",
-          "For multi-team organizations with advanced controls.",
-        ],
-      ].map((p, i) => (
-        <article className={i === 1 ? "featured" : ""} key={p[0]}>
-          {i === 1 && <Pill tone="green">MOST POPULAR</Pill>}
-          <h2>{p[0]}</h2>
-          <p>{p[2]}</p>
-          <b>{p[1]}</b>
-          {p[1] !== "Custom" && <small>/ month</small>}
-          <Button
-            as={Link}
-            to="/signup"
-            kind={i === 1 ? "primary" : "secondary"}
-          >
-            Choose {p[0]}
-          </Button>
-          {[
-            "Connected sales workspace",
-            "ICP and prospect discovery",
-            "Campaign approval workflow",
-            "Pipeline and revenue reporting",
-          ].map((x) => (
-            <span className="checkLine" key={x}>
-              <Check /> {x}
-            </span>
-          ))}
-        </article>
-      ))}
-    </section>
-  );
-}
+function Pricing() { return <OnePagePricing />; }
+
 function Blog() {
   return (
     <section className="blogGrid">
@@ -1305,6 +1259,7 @@ function DataSourcesPage() {
           <h2>Business contact information</h2>
           <p>Discovery includes public business listings and contact details published on business websites. Listings can be incomplete, outdated or incorrectly categorized. A published contact or a working website does not establish permission to send marketing messages. Review a business before contacting it.</p>
         </section>
+        <section><h2>AI-assisted research and advice</h2><p>Public business research may use Google search assistance to locate candidate websites. AI suggestions are checked against business evidence before replacing a catalog website. Sales advisor uses your organization’s company context and sales activity; only documents you explicitly attach are sent for that answer. AI suggestions can be incomplete and do not establish permission to contact a person.</p></section>
         <section>
           <h2>Overture Maps Foundation</h2>
           <p>Contains data from Overture Maps Foundation Places, including release 2026-10-21.0. Records may include data from Meta, Microsoft, Uberall, PinMeTo, DAC and OpenTravel under CDLA Permissive 2.0, AllThePlaces under CC0 1.0 and Foursquare under Apache 2.0.</p>

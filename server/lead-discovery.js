@@ -87,7 +87,7 @@ export async function findMappedBusinesses(env, city, country, industry, terms =
   const keywordClauses = alternatives ? keywordFields.map((field) =>
     'nwr(area.place)(area.country)["name"]["' + field + '"~' + JSON.stringify(alternatives) + ',i];'
   ).join("") : "";
-  const data = `[out:json][timeout:9];area["ISO3166-1"=${JSON.stringify(country)}]["admin_level"="2"]->.country;area["name"~${JSON.stringify(cityPattern)},i]["boundary"="administrative"]->.place;(${clauses}${keywordClauses});out tags 45;`;
+  const data = `[out:json][timeout:9];area["ISO3166-1"=${JSON.stringify(country)}]["admin_level"="2"]->.country;area["name"~${JSON.stringify(cityPattern)},i]["boundary"="administrative"]->.place;(${clauses}${keywordClauses});out tags 200;`;
   let records;
   try {
     const endpoint = new URL(

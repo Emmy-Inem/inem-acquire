@@ -1,3 +1,4 @@
+import CatalogMaintenance from "./CatalogMaintenance";
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Navigate, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Building2, ChevronLeft, ChevronRight, ClipboardList, Headset, Inbox, LogOut, Plus, Search, ShieldCheck, X } from "lucide-react";
@@ -139,6 +140,7 @@ function OrganizationDirectory({ organizationId }) {
         <div className="consoleMetric consoleSupportMetric"><span>My active support sessions</span><strong>{active.length}</strong></div>
       </div>
       {summary.error && <ConsoleState resource={summary} />}
+      <CatalogMaintenance />
       <div className={"consoleSplit" + (organizationId ? " consoleSelected" : "")}>
         <section className="consolePanel consoleDirectory" aria-labelledby="console-directory-heading">
           <div className="consolePanelHeader">

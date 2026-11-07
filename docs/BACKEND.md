@@ -5,7 +5,7 @@
 The Supabase project `iblhpkoxlcttwhspiduu` hosts PostgreSQL, authentication, a private document bucket, and three deployed Edge Functions:
 
 - `workspace-api`: authenticated organization-scoped listing, creation, editing and deletion.
-- `sales-intelligence`: a persisted diagnosis and sourced, rules-based advisor using actual records. It is deliberately labeled rules-based; no external language model is connected.
+- `sales-intelligence`: a persisted diagnosis and sourced, rules-based advisor using actual records. Its deterministic findings remain available if AI is unavailable. The Node advisor additionally uses organization-scoped company/sales context and explicitly selected documents with the configured Gemini model.
 - `campaign-delivery`: manager-approved sending to opted-in contacts through Resend. A batch is limited to 10 recipients. Provider credentials must be supplied before sending is enabled.
 
 Each function validates the bearer token with Supabase Auth inside the function. Gateway `verify_jwt = false` does **not** make the handlers anonymous: missing or invalid user credentials are rejected by the handler. This supports current Supabase signing keys while retaining explicit authentication checks.
@@ -122,3 +122,13 @@ The 10-organization smoke run created 10 temporary accounts and populated offers
 Discovery source licenses are linked at /data-sources. Published website links require a recent match to the business name or company markup. Unreviewed, unmatched, inaccessible and parked pages show a verification state. Contact information can still be reviewed independently. The verify-discovery-websites script reviews a resumable batch, and catalog website changes invalidate previous checks.
 
 Campaign delivery and paid billing require configured live providers and an end-to-end provider test before those features are offered. Auth email uses its separately configured Supabase SMTP sender.
+
+## Acquisition workflow release
+
+Discovery expands up to 50 businesses and streams up to 50 website checks. Public source availability can yield fewer real matches. AI-assisted recovery requires both a matching business identity and corroborating published phone/location evidence before replacing a domain. `record_discovery_website_review` locks the listing, preserves the old URL, records evidence and confirms its status after the URL invalidation trigger. Confirmed published inboxes/phones fill empty catalog contact fields. The platform console provides a guarded 20-record repair batch.
+
+Company photos are private validated raster files, served as authenticated image data. Documents can be uploaded, opened with short-lived links, explicitly attached to an Advisor question, and deleted with approval permission. Advisor document access always includes the organization filter; selected files total at most 2 MB per answer.
+
+Monthly research usage is reserved atomically (500 Starter, 2,500 Growth); catalog browsing does not consume research credits. Active offers/profiles and invitation seats follow the advertised plans. Growth plan and Scale/custom capacity remain controlled by the recorded billing account; clients cannot change them. Billing displays usage. Stripe/Resend/domain/SSO remain external launch gates; a configured key alone is not delivery or payment verification. Landing and dedicated pricing share the same component.
+
+Checks: `npm test`, `npm run test:integration`, `npm run test:workflows`, rendered browser workflow tests. Provider-dependent email/billing need their own end-to-end checks after configuration.

@@ -197,3 +197,7 @@ button.consoleMetric:hover, .consoleMetric[aria-pressed="true"] { border-color: 
 @media (prefers-reduced-motion: reduce) {
   button.consoleMetric { transition: none; }
 }
+.consoleCatalogTools { border: 1px solid #dfe6ef; border-radius: 10px; background: #fff; padding: 16px 20px; margin: 18px 0; }
+.consoleCatalogTools summary { cursor: pointer; font-size: 13px; font-weight: 650; color: #25446b; min-height: 28px; }
+.consoleCatalogTools p { font-size: 13px; color: #637087; line-height: 1.7; max-width: 850px; }
+.consoleCatalogTools .btn { margin-right: 8px; margin-bottom: 8px; }

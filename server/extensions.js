@@ -1,3 +1,7 @@
+import {
+  corroboratesBusiness,
+  resolveBusinessWebsite,
+} from "./website-recovery.js";
 import { findOutsideCatalog } from "./extended-discovery.js";
 import { searchCatalog } from "./discovery-catalog.js";
 import express from "express";
@@ -302,6 +306,105 @@ export function extensionRoutes(
       res.json({ url: session.url });
     }),
   );
+  const reserve = async (org, units = 1) => {
+    const budget = result(
+      await admin().rpc("reserve_research_credits", { org, units }),
+    );
+    if (!budget.allowed)
+      throw Object.assign(
+        new Error(
+          "Your monthly research credits are used. Browse saved results or review your plan in Billing.",
+        ),
+        { status: 429 },
+      );
+    return budget;
+  };
+  app.get(
+    "/api/research-usage",
+    auth,
+    organization("read"),
+    wrap(async (req, res) => res.json(await reserve(req.org, 0))),
+  );
+  app.post(
+    "/api/platform/catalog/review",
+    wrap(async (req, res) => {
+      const { limit } = z
+        .object({ limit: z.number().int().min(1).max(20).default(20) })
+        .strict()
+        .parse(req.body);
+      if (!env.GEMINI_API_KEY)
+        return res
+          .status(503)
+          .json({
+            error:
+              "Connect AI assistance before starting catalog website recovery.",
+          });
+      const db = admin();
+      const rows = result(
+        await db
+          .from("discovery_catalog")
+          .select(
+            "overture_place_id,name,website,city,region,address,country,phone",
+          )
+          .in("website_status", ["needs_review", "unavailable"])
+          .not("website", "is", null)
+          .order("website_checked_at", { nullsFirst: true })
+          .limit(limit),
+      );
+      const stop = new AbortController();
+      res.on("close", () => stop.abort());
+      res.type("application/x-ndjson");
+      res.flushHeaders();
+      let cursor = 0,
+        reviewed = 0,
+        confirmed = 0,
+        recovered = 0;
+      const worker = async () => {
+        while (!stop.signal.aborted && cursor < rows.length) {
+          const item = rows[cursor++];
+          try {
+            const outcome = await resolveBusinessWebsite(env, item);
+            const saved = result(
+              await db.rpc("record_discovery_website_review", {
+                listing: item.overture_place_id,
+                expected_website: item.website,
+                confirmed_website: outcome.website,
+                new_status: outcome.websiteStatus,
+                reason: outcome.error || null,
+                evidence: outcome.contacts.map((p) => ({
+                  source: p.source,
+                  emails: p.emails,
+                  phones: p.phones,
+                })),
+              }),
+            );
+            if (saved && outcome.websiteStatus === "verified") confirmed++;
+            if (saved && outcome.recovered) recovered++;
+          } catch {
+            /* Leave an unsuccessful row available for a future review. */
+          }
+          reviewed++;
+          if (!stop.signal.aborted)
+            res.write(
+              JSON.stringify({
+                reviewed,
+                confirmed,
+                recovered,
+                total: rows.length,
+              }) + "\n",
+            );
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(4, rows.length) }, worker),
+      );
+      if (!rows.length)
+        res.write(
+          JSON.stringify({ reviewed: 0, confirmed: 0, recovered: 0 }) + "\n",
+        );
+      if (!stop.signal.aborted) res.end();
+    }),
+  );
   const researchLimit = rateLimit({
     windowMs: 60_000,
     limit: 5,
@@ -315,7 +418,10 @@ export function extensionRoutes(
     windowMs: 60_000,
     limit: 60,
     keyGenerator: (req) => req.user.id,
-    handler: (_req, res) => res.status(429).json({ error: "Please wait a minute before browsing more results." }),
+    handler: (_req, res) =>
+      res
+        .status(429)
+        .json({ error: "Please wait a minute before browsing more results." }),
   });
   const publicText = /^[\p{L}\p{M}\d .,&'’()-]+$/u;
   app.post(
@@ -324,15 +430,28 @@ export function extensionRoutes(
     organization("write"),
     researchLimit,
     wrap(async (req, res) => {
-      const query = z.object({
-        city: z.string().trim().min(2).max(75).regex(publicText),
-        country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
-        industry: z.enum(["all", ...Object.keys(industries)]),
-        keyword: z.string().trim().max(100).default(""),
-      }).strict().parse(req.body);
-      if ((query.keyword && !publicText.test(query.keyword)) ||
-          (query.industry === "all" && !/[\p{L}\p{N}]{2}/u.test(query.keyword)))
-        return res.status(400).json({ error: "Choose an industry or enter a public business keyword." });
+      const query = z
+        .object({
+          city: z.string().trim().min(2).max(75).regex(publicText),
+          country: z
+            .string()
+            .trim()
+            .toUpperCase()
+            .regex(/^[A-Z]{2}$/),
+          industry: z.enum(["all", ...Object.keys(industries)]),
+          keyword: z.string().trim().max(100).default(""),
+        })
+        .strict()
+        .parse(req.body);
+      if (
+        (query.keyword && !publicText.test(query.keyword)) ||
+        (query.industry === "all" && !/[\p{L}\p{N}]{2}/u.test(query.keyword))
+      )
+        return res
+          .status(400)
+          .json({
+            error: "Choose an industry or enter a public business keyword.",
+          });
       res.json(await findOutsideCatalog(env, admin(), query));
     }),
   );
@@ -345,30 +464,61 @@ export function extensionRoutes(
       const query = z
         .object({
           city: z.string().trim().max(75).default(""),
-          country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
+          country: z
+            .string()
+            .trim()
+            .toUpperCase()
+            .regex(/^[A-Z]{2}$/),
           industry: z.enum(["all", ...Object.keys(industries)]),
           keyword: z.string().trim().max(100).default(""),
           page: z.number().int().min(1).max(1_000_000).default(1),
-          pageSize: z.union([z.literal(20), z.literal(50), z.literal(100)]).default(20),
+          pageSize: z
+            .union([z.literal(20), z.literal(50), z.literal(100)])
+            .default(20),
           contact: z.enum(["any", "email", "phone", "both"]).default("any"),
         })
         .strict()
         .parse(req.body);
-      if ([query.city, query.keyword].some(
-        (value) => value && !publicText.test(value),
-      ))
-        return res.status(400).json({ error: "Enter a valid location or business keyword." });
+      if (
+        [query.city, query.keyword].some(
+          (value) => value && !publicText.test(value),
+        )
+      )
+        return res
+          .status(400)
+          .json({ error: "Enter a valid location or business keyword." });
 
       if (query.country === "NG") {
         const result = await searchCatalog(admin(), query);
-        if (result.companies.length || query.page > 1 || query.keyword ||
-            !query.city || query.industry === "all" || query.contact !== "any") return res.json(result);
+        if (
+          result.companies.length ||
+          query.page > 1 ||
+          query.keyword ||
+          !query.city ||
+          query.industry === "all" ||
+          query.contact !== "any"
+        )
+          return res.json(result);
       }
-      if (query.city.length < 2 || query.industry === "all" || query.keyword || query.page !== 1)
-        return res.status(400).json({ error: "For searches outside Nigeria, enter a city and choose an industry." });
+      if (
+        query.city.length < 2 ||
+        query.industry === "all" ||
+        query.keyword ||
+        query.page !== 1
+      )
+        return res
+          .status(400)
+          .json({
+            error:
+              "For searches outside Nigeria, enter a city and choose an industry.",
+          });
       return researchLimit(req, res, (error) => {
         if (error) return next(error);
-        return wrap(async () => res.json(await findBusinesses(env, query)))(req, res, next);
+        return wrap(async () => res.json(await findBusinesses(env, query)))(
+          req,
+          res,
+          next,
+        );
       });
     }),
   );
@@ -378,24 +528,54 @@ export function extensionRoutes(
     organization("write"),
     researchLimit,
     wrap(async (req, res) => {
-      const { id } = z.object({ id: z.string().min(1).max(100) }).strict().parse(req.body);
+      const { id } = z
+        .object({ id: z.string().min(1).max(100) })
+        .strict()
+        .parse(req.body);
       const db = admin();
-      const item = result(await db.from("discovery_catalog").select("name,website").eq("overture_place_id", id).maybeSingle());
-      if (!item?.website) return res.status(404).json({ error: "No website is available for this business." });
-      let contacts = [], status = "verified", error;
-      try {
-        contacts = await scanBusinessWebsite(item.website, { country: "NG", expectedName: item.name });
-      } catch (failure) {
-        status = failure.message === "This website is unavailable or parked." ? "unavailable" : "needs_review";
-        error = failure.message;
-      }
-      const updated = result(await db.from("discovery_catalog")
-        .update({ website_status: status, website_checked_at: new Date().toISOString() })
-        .eq("overture_place_id", id).eq("website", item.website).select("overture_place_id"));
-      if (!updated.length) return res.status(409).json({ error: "The listing changed. Refresh the results before checking again." });
+      const item = result(
+        await db
+          .from("discovery_catalog")
+          .select("name,website,city,region,address,country,phone")
+          .eq("overture_place_id", id)
+          .maybeSingle(),
+      );
+      if (!item) return res.status(404).json({ error: "Business not found." });
+      if (!item.website && !env.GEMINI_API_KEY)
+        return res
+          .status(503)
+          .json({
+            error:
+              "Website recovery is temporarily unavailable. Published contact details are still available.",
+          });
+      await reserve(req.org);
+      const outcome = await resolveBusinessWebsite(env, item);
+      const { contacts, websiteStatus: status, error } = outcome;
+      const updated = result(
+        await db.rpc("record_discovery_website_review", {
+          listing: id,
+          expected_website: item.website,
+          confirmed_website: outcome.website,
+          new_status: status,
+          reason: error || null,
+          evidence: contacts.map((page) => ({
+            source: page.source,
+            emails: page.emails,
+            phones: page.phones,
+            phoneMatched: page.phones?.includes(item.phone),
+          })),
+        }),
+      );
+      if (!updated)
+        return res
+          .status(409)
+          .json({
+            error: "The listing changed. Refresh before checking again.",
+          });
       res.json({
-        websiteStatus: status, website: status === "verified" ? item.website : null,
-        contacts, error,
+        ...outcome,
+        contacts,
+        error,
       });
     }),
   );
@@ -409,6 +589,7 @@ export function extensionRoutes(
         .object({ website: z.string().trim().max(500).url() })
         .strict()
         .parse(req.body);
+      await reserve(req.org);
       res.json({ contacts: await scanBusinessWebsite(website) });
     }),
   );
@@ -426,6 +607,8 @@ export function extensionRoutes(
                 .object({
                   website: z.string().trim().max(500).url(),
                   name: z.string().trim().min(1).max(200).optional(),
+                  city: z.string().trim().max(75).optional(),
+                  require_location: z.boolean().optional(),
                   country: z
                     .string()
                     .regex(/^[A-Z]{2}$/)
@@ -434,7 +617,7 @@ export function extensionRoutes(
                 .strict(),
             )
             .min(1)
-            .max(12),
+            .max(50),
         })
         .strict()
         .parse(req.body);
@@ -447,15 +630,26 @@ export function extensionRoutes(
       const worker = async () => {
         while (!stop.signal.aborted && cursor < websites.length) {
           const index = cursor++;
-          const { website, country, name } = websites[index];
+          const { website, country, name, city, require_location } =
+            websites[index];
           let row;
           try {
+            await reserve(req.org);
             const contacts = await scanBusinessWebsite(website, {
               country,
               signal: stop.signal,
               expectedName: name,
             });
-            row = { index, contacts, websiteStatus: name ? "verified" : "unreviewed", website: name ? website : null };
+            if (require_location && !corroboratesBusiness({ city }, contacts))
+              throw new Error(
+                "The business location could not be confirmed on this website.",
+              );
+            row = {
+              index,
+              contacts,
+              websiteStatus: name ? "verified" : "unreviewed",
+              website: name ? website : null,
+            };
           } catch (error) {
             row = { index, error: error.message };
           }

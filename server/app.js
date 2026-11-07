@@ -1,3 +1,5 @@
+import { companyAssetRoutes } from "./company-assets.js";
+import { answerSalesQuestion } from "./sales-advisor.js";
 import { platformOrganizationRoutes } from "./platform-organizations.js";
 import { suggestedNextSteps } from "./gemini.js";
 import { webhookRoutes, extensionRoutes } from "./extensions.js";
@@ -103,7 +105,7 @@ export function createApp({
     Promise.resolve(fn(req, res, next)).catch(next);
   const result = (r) => {
     if (r.error)
-      throw Object.assign(new Error("The request could not be completed"), {
+      throw Object.assign(new Error(r.error.code === "P0001" && /^(Starter includes|Your plan has|An active invitation)/.test(r.error.message||"") ? r.error.message : "The request could not be completed"), {
         status: r.error.code === "42501" ? 403 : 400,
       });
     return r.data;
@@ -380,6 +382,7 @@ export function createApp({
       req.permissions = permissions;
       next();
     });
+  companyAssetRoutes(app, {auth, organization, wrap, result});
   const edge = async (req, name, payload) => {
     const response = await fetch(`${url}/functions/v1/${name}`, {
       method: "POST",
@@ -652,27 +655,8 @@ export function createApp({
     auth,
     organization("read"),
     wrap(async (req, res) => {
-      const { question } = z
-        .object({ question: z.string().min(3).max(2000) })
-        .parse(req.body);
-      const advice = await edge(req, "sales-intelligence", {
-        organization_id: req.org,
-        action: "advisor",
-        question,
-      });
-      const topic = [
-        ["tasks", /follow.up|task|overdue/i],
-        ["deals", /deal|pipeline/i],
-        ["icps", /ideal|target|segment/i],
-        ["contacts", /email|outreach|consent/i],
-        ["offers", /offer|pricing/i],
-      ].find(([, pattern]) => pattern.test(question))?.[0];
-      const steps = await suggestedNextSteps(
-        env,
-        (advice.sources || []).map((source) => ({ source: source.table })),
-        topic,
-      );
-      res.json({ ...advice, gemini_steps: steps });
+      const input = z.object({question:z.string().trim().min(3).max(2000),document_ids:z.array(z.string().uuid()).max(3).default([]),history:z.array(z.object({question:z.string().max(2000),answer:z.string().max(8000)}).strict()).max(4).default([])}).strict().parse(req.body);
+      res.json(await answerSalesQuestion(env, req.db, req.org, input));
     }),
   );
   app.post(
@@ -765,19 +749,7 @@ export function createApp({
           error: "Organization owner required to invite administrators",
         });
       const token = randomBytes(32).toString("hex");
-      const row = result(
-        await admin()
-          .from("invitations")
-          .insert({
-            organization_id: req.org,
-            email: data.email.toLowerCase(),
-            role: data.role,
-            token_hash: createHash("sha256").update(token).digest("hex"),
-            invited_by: req.user.id,
-          })
-          .select("id,email,role,expires_at")
-          .single(),
-      );
+      const row = result(await admin().rpc("create_plan_invitation", {org:req.org,address:data.email,member_role:data.role,hash:createHash("sha256").update(token).digest("hex"),actor:req.user.id}));
       await admin().from("audit_events").insert({
         organization_id: req.org,
         actor_id: req.user.id,
@@ -792,6 +764,13 @@ export function createApp({
       });
     }),
   );
+  app.delete("/api/invitations/:id",auth,organization("manage"),wrap(async(req,res)=>{
+    const id=uuid.parse(req.params.id);const invitation=result(await req.db.from("invitations").select("role,accepted_at").eq("organization_id",req.org).eq("id",id).single());
+    const member=result(await req.db.from("memberships").select("role").eq("organization_id",req.org).eq("user_id",req.user.id).single());
+    if(invitation.accepted_at)return res.status(409).json({error:"This invitation has already been accepted."});
+    if(invitation.role==="admin"&&member.role!=="owner")return res.status(403).json({error:"Only the owner can revoke an administrator invitation."});
+    result(await admin().from("invitations").delete().eq("organization_id",req.org).eq("id",id).is("accepted_at",null));res.json({success:true});
+  }));
   app.post(
     "/api/invitations/accept",
     auth,
@@ -927,19 +906,19 @@ export function createApp({
         )
       )
         return res.status(404).json({ error: "Export not available" });
-      const rows = result(
-        await req.db
-          .from(req.params.resource)
-          .select("*")
-          .eq("organization_id", req.org)
-          .order("created_at")
-          .limit(5000),
-      );
+      const rows=[];
+      for(let offset=0;offset<5000;offset+=1000){
+        const batch=result(await req.db.from(req.params.resource).select("*").eq("organization_id",req.org).order("created_at").order("id").range(offset,offset+999));
+        rows.push(...batch);if(batch.length<1000)break;
+      }
       if (!rows.length)
         return res
           .status(400)
           .json({ error: "There are no records to export" });
-      const columns = Object.keys(rows[0]);
+      const available=Object.keys(rows[0]);
+      const requested=typeof req.query.fields === "string" ? req.query.fields.split(",").map(s=>s.trim()).filter(Boolean) : [];
+      if(requested.some(name=>!available.includes(name)))return res.status(400).json({error:"One or more report columns are invalid. Use field names from the selected module."});
+      const columns=requested.length?[...new Set(requested)]:available.filter(name=>name!=="organization_id");
       const cell = (v) =>
         '"' +
         String(v ?? "")

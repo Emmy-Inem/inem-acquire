@@ -7,7 +7,8 @@
     "test": "node --test tests/*.test.js",
     "test:integration": "node tests/integration.js",
     "test:browser": "node tests/browser.js",
-    "test:auth": "node tests/password-reset.integration.js"
+    "test:auth": "node tests/password-reset.integration.js",
+    "test:workflows": "node tests/workflow.integration.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",

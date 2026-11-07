@@ -19,6 +19,7 @@ export const resourceSchemas = {
     .object({
       name: text,
       description: notes,
+      status: z.enum(["active", "archived"]).default("active"),
       price: z.number().min(0).max(1e12).nullable().optional(),
       currency: z
         .string()
@@ -38,6 +39,8 @@ export const resourceSchemas = {
     .object({
       name: text,
       website,
+      email: z.string().email().nullable().optional(),
+      phone: optionalText,
       industry: optionalText,
       country: optionalText,
       source_url: website,
@@ -51,6 +54,8 @@ export const resourceSchemas = {
   contacts: z
     .object({
       full_name: text,
+      phone: optionalText,
+      notes,
       email: z.string().email().nullable().optional(),
       job_title: optionalText,
       prospect_id: uuid,

@@ -265,6 +265,8 @@ try {
   );
   assert.equal(missingProvider.status, 503);
   check("missing email provider fails explicitly without sending messages");
+  // This permission-matrix fixture contains every role; use a custom seat allowance.
+  ok(await admin.from("billing_accounts").update({plan:"scale"}).eq("organization_id", a.org));
   const c = await account("invite");
   const invitation = await post(a, "/invitations", a.org, {
     email: c.email,
