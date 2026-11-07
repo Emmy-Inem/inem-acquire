@@ -144,7 +144,7 @@ export function AuthPage({ mode }) {
           return;
         }
         await refresh();
-        navigate("/onboarding/welcome");
+        navigate(location.state?.from || "/onboarding/welcome");
       }
       if (mode === "login") {
         await api("/auth/login", {
@@ -268,6 +268,11 @@ export function AuthPage({ mode }) {
                   <Link to="/login" state={{ from: location.pathname }}>
                     Sign in to accept
                   </Link>
+                  {" or "}
+                  <Link to="/signup" state={{ from: location.pathname }}>
+                    Create an account
+                  </Link>
+                  .
                 </p>
               )}
               {!["verify-email", "callback"].includes(mode) && (
@@ -298,7 +303,10 @@ export function AuthPage({ mode }) {
                 Forgot password?
               </Link>
               <p className="switch">
-                New to Inem Acquire? <Link to="/signup">Create an account</Link>
+                New here?{" "}
+                <Link to="/signup" state={location.state}>
+                  Create an account
+                </Link>
               </p>
             </>
           )}
@@ -335,7 +343,10 @@ export function AuthPage({ mode }) {
           )}
           {mode === "signup" && (
             <p className="switch">
-              Already have an account? <Link to="/login">Sign in</Link>
+              Already have an account?{" "}
+              <Link to="/login" state={location.state}>
+                Sign in
+              </Link>
             </p>
           )}
           {mode === "verify-email" && (
@@ -386,8 +397,8 @@ export function SetupPage() {
                 industry: industry || null,
               },
             });
-            selectOrganization(data.id);
             await refresh();
+            selectOrganization(data.id);
             navigate("/app/dashboard");
           } catch (e) {
             setError(e.message);

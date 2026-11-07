@@ -127,6 +127,14 @@ export function createApp({
       limit: 25,
       standardHeaders: true,
       legacyHeaders: false,
+      handler: (_req, res) =>
+        res
+          .status(429)
+          .json({
+            error:
+              "Too many sign-in attempts. Please wait a few minutes and try again.",
+            code: "auth_rate_limited",
+          }),
     }),
   );
   webhookRoutes(app, { env, admin, result, wrap });
@@ -145,13 +153,11 @@ export function createApp({
         error.code,
       )
     )
-      return res
-        .status(429)
-        .json({
-          code: "auth_rate_limited",
-          error:
-            "Too many attempts. Please wait a few minutes before trying again.",
-        });
+      return res.status(429).json({
+        code: "auth_rate_limited",
+        error:
+          "Too many attempts. Please wait a few minutes before trying again.",
+      });
     if (
       [
         "email_address_not_authorized",
@@ -160,23 +166,19 @@ export function createApp({
       ].includes(error.code) ||
       error.status >= 500
     )
-      return res
-        .status(503)
-        .json({
-          code: "auth_service_unavailable",
-          error:
-            action === "login"
-              ? "Sign-in is temporarily unavailable. Please try again shortly."
-              : "We could not send your verification email. Please try again shortly or contact support.",
-        });
+      return res.status(503).json({
+        code: "auth_service_unavailable",
+        error:
+          action === "login"
+            ? "Sign-in is temporarily unavailable. Please try again shortly."
+            : "We could not send your verification email. Please try again shortly or contact support.",
+      });
     if (error.code === "email_not_confirmed")
-      return res
-        .status(403)
-        .json({
-          code: "email_not_confirmed",
-          error:
-            "Confirm your email address before signing in. Check your inbox or request a new confirmation link below.",
-        });
+      return res.status(403).json({
+        code: "email_not_confirmed",
+        error:
+          "Confirm your email address before signing in. Check your inbox or request a new confirmation link below.",
+      });
     return res.status(action === "login" ? 401 : 400).json({
       code: action === "login" ? "invalid_credentials" : "signup_failed",
       error:
@@ -424,6 +426,25 @@ export function createApp({
       });
     }),
   );
+  app.patch(
+    "/api/profile",
+    auth,
+    wrap(async (req, res) => {
+      const values = z
+        .object({ full_name: z.string().trim().min(2).max(120) })
+        .strict()
+        .parse(req.body);
+      const profile = result(
+        await req.db
+          .from("profiles")
+          .update(values)
+          .eq("id", req.user.id)
+          .select("id,full_name")
+          .single(),
+      );
+      res.json({ profile });
+    }),
+  );
   app.post(
     "/api/auth/password",
     auth,
@@ -529,7 +550,12 @@ export function createApp({
     app[method](
       ["/api/resources/:resource", "/api/resources/:resource/:id"],
       auth,
-      organization(method === "delete" ? "approve" : "write"),
+      (req, res, next) =>
+        organization(
+          method === "delete" && req.params.resource !== "campaign_recipients"
+            ? "approve"
+            : "write",
+        )(req, res, next),
       wrap(async (req, res) => {
         const action = { post: "create", patch: "update", delete: "delete" }[
           method
@@ -798,7 +824,7 @@ export function createApp({
       res.json({ success: true });
     }),
   );
-  app.get("/api/integrations", auth, organization("manage"), (_req, res) =>
+  app.get("/api/integrations", auth, organization("read"), (_req, res) =>
     res.json({
       providers: [
         {

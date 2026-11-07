@@ -1,0 +1,723 @@
+/* Workspace surfaces and controls use one scale across modules. */
+@media (min-width: 821px) {
+  .appShell .appSide {
+    transform: none;
+    transition: none;
+  }
+}
+.appShell {
+  --workspace-line: #dfe6ef;
+  --workspace-muted: #61708a;
+  --workspace-accent: #0757f6;
+  background: #f6f8fc;
+  color: #132643;
+}
+.appShell .appSide {
+  width: 244px;
+  background: #f7f9fd;
+  border-color: var(--workspace-line);
+  padding: 24px 16px 18px;
+}
+.appShell {
+  grid-template-columns: 244px minmax(0, 1fr);
+}
+.appShell .appBody {
+  margin: 0;
+  min-width: 0;
+}
+.appShell .sideTop {
+  padding: 0 8px 24px;
+}
+.appShell .sideTop .brand {
+  width: 182px;
+}
+.appShell .workspace {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: none;
+  gap: 10px;
+  min-height: 50px;
+  display: flex;
+}
+.appShell .workspace select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  outline-offset: 3px;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  min-height: 28px;
+  padding: 2px 24px 2px 2px;
+  background: transparent;
+  width: 100%;
+  min-width: 0;
+  color: #132643;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23596780' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right center;
+  background-repeat: no-repeat;
+}
+.createWorkspaceLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  margin: 4px 0 10px;
+  color: #586b86;
+  font-size: 12px;
+  min-height: 40px;
+  border-radius: 8px;
+}
+.createWorkspaceLink:hover {
+  color: #0757f6;
+  background: #edf3ff;
+}
+.appShell .navGroup {
+  margin-bottom: 16px;
+}
+.appShell .navGroup > small {
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  color: #718099;
+  margin-bottom: 8px;
+}
+.appShell .navGroup a,
+.appShell .sideBottom > a {
+  font-size: 13px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  gap: 10px;
+  color: #52637d;
+}
+.appShell .navGroup a svg,
+.appShell .sideBottom > a svg {
+  width: 18px;
+  height: 18px;
+}
+.appShell .navGroup a.active,
+.appShell .sideBottom > a.active {
+  color: #0757f6;
+  background: #e6eeff;
+  font-weight: 650;
+}
+.appShell .sideBottom {
+  padding-top: 12px;
+}
+.appShell .sideBottom > a {
+  display: flex;
+  align-items: center;
+}
+.appShell .userChip {
+  padding: 14px 4px 0;
+  gap: 10px;
+}
+.appShell .userChip b {
+  font-size: 12px;
+  font-weight: 650;
+}
+.appShell .userChip small {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.appShell .avatar {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  font-size: 11px;
+}
+.appShell .appTop {
+  height: 72px;
+  padding: 12px 32px;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  border-bottom: 1px solid var(--workspace-line);
+  background: #ffffffed;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.workspaceSearchTrigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  width: min(460px, 60%);
+  padding: 10px 14px;
+  text-align: left;
+  color: #738098;
+  border: 1px solid var(--workspace-line);
+  border-radius: 12px;
+  background: #f8faff;
+  font-size: 13px;
+}
+.workspaceSearchTrigger kbd {
+  margin-left: auto;
+  border: 1px solid #dce4f0;
+  background: #fff;
+  padding: 3px 6px;
+  border-radius: 5px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.workspaceTopActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.workspaceHelp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #61708a;
+  font-size: 12px;
+  min-height: 44px;
+  border-radius: 8px;
+}
+.workspaceAccount {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+.appShell .appMain {
+  max-width: 1600px;
+  padding: 32px;
+  min-height: calc(100dvh - 72px);
+}
+.appShell .pageHeader {
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+.appShell .pageHeader h1 {
+  font-size: 30px;
+  line-height: 1.22;
+  letter-spacing: -0.04em;
+  margin: 0 0 9px;
+  font-weight: 650;
+}
+.appShell .pageHeader p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--workspace-muted);
+  max-width: 720px;
+  margin: 0;
+}
+.appShell .headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.appShell .btn {
+  min-height: 42px;
+  padding: 10px 17px;
+  line-height: 1.4;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 650;
+  box-shadow: none;
+  gap: 8px;
+}
+.appShell .btn.primary {
+  background: #0757f6;
+  color: #fff;
+  box-shadow: 0 3px 8px #0757f615;
+}
+.appShell .btn.secondary {
+  background: #fff;
+  border-color: #d8e1ee;
+}
+.appShell .btn:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+}
+.appShell .panel {
+  border: 1px solid var(--workspace-line);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px #162d4c04;
+  background: #fff;
+}
+.appShell .livePanel {
+  padding: 24px;
+  margin: 20px 0;
+}
+.appShell .liveTwoColumns > .livePanel {
+  margin: 0;
+}
+.appShell .livePanel h2 {
+  font-size: 19px;
+  line-height: 1.4;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+}
+.appShell .livePanel > p {
+  font-size: 13px;
+  line-height: 1.75;
+}
+.appShell .liveMetric {
+  padding: 16px 0;
+  gap: 18px;
+  font-size: 13px;
+}
+.appShell .liveMetric b {
+  font-weight: 600;
+}
+.appShell .field > span,
+.appShell .field > label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.appShell .field input,
+.appShell .field select,
+.appShell .field textarea {
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 11px 13px;
+  border-color: #d6dfed;
+  font-size: 13px;
+  background: #fff;
+  color: #132643;
+}
+.appShell .field textarea {
+  line-height: 1.7;
+}
+.appShell .liveSearch {
+  margin: 20px 0;
+  padding: 6px 8px 6px 16px;
+  border-color: var(--workspace-line);
+  border-radius: 12px;
+}
+.appShell .liveSearch > input {
+  font-size: 13px;
+}
+.appShell .liveState {
+  padding: 48px 24px;
+  color: var(--workspace-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.appShell .liveState h2 {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+.appShell .liveState p {
+  margin-bottom: 0;
+}
+.appShell .liveRecords th {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #67788e;
+  background: #f8faff;
+  padding: 14px 18px;
+}
+.appShell .liveRecords td {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 18px;
+  border-color: #e8edf5;
+}
+.appShell .liveRowActions button {
+  font-size: 12px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+.appShell .pagination {
+  padding: 14px 18px;
+  font-size: 12px;
+}
+.appShell .pagination button {
+  min-height: 36px;
+  min-width: 40px;
+  border-radius: 8px;
+}
+.appShell .liveImport {
+  margin: 0 0 12px;
+  padding: 0;
+}
+.appShell .liveImport small {
+  font-size: 11px;
+  color: #718099;
+  max-width: 700px;
+}
+.appShell .settingsForm {
+  padding: 24px;
+  max-width: none;
+}
+.appShell .liveNotice,
+.appShell .liveError {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.appShell .diagnosisHero {
+  border-radius: 16px;
+  padding: 28px;
+}
+.appShell .diagnosisHero h2 {
+  font-size: 27px;
+  line-height: 1.35;
+}
+.appShell .diagnosisHero p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #deebff;
+}
+.appShell .kanbanCol {
+  border-radius: 14px;
+  padding: 12px;
+  background: #edf2f9;
+  min-height: 380px;
+}
+.appShell .kanbanCol article {
+  border-radius: 12px;
+  box-shadow: 0 2px 5px #10234206;
+  padding: 16px;
+}
+.appShell .kanbanCol h3 {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.appShell .kanbanCol article > b {
+  font-size: 13px;
+}
+.appShell .findingGrid h2 {
+  font-size: 19px;
+  line-height: 1.4;
+}
+.appShell .liveModal .btn {
+  min-height: 44px;
+}
+.workspaceSearchDialog .searchHint {
+  font-size: 13px;
+  color: #61708a;
+}
+.searchGroup {
+  padding-top: 12px;
+}
+.searchGroup h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #718099;
+}
+.searchGroup a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 10px;
+  border-radius: 10px;
+  line-height: 1.5;
+  font-size: 14px;
+  min-height: 44px;
+}
+.searchGroup a:hover {
+  background: #f0f5ff;
+  color: #0757f6;
+}
+.guideGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.guideGrid .livePanel {
+  margin: 0;
+}
+.guideStep {
+  display: block;
+  color: #718099;
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+.appShell .readinessPanel {
+  padding: 24px;
+  margin-bottom: 24px;
+  background: #fff;
+}
+.readinessPanel h2 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+.readinessPanel p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #61708a;
+}
+.readinessSteps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.readinessSteps a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #dce6f4;
+  border-radius: 10px;
+  font-size: 12px;
+  min-height: 44px;
+}
+.readinessSteps a.complete {
+  color: #28624c;
+  background: #f2faf6;
+  border-color: #d5e9df;
+}
+.resourceTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 20px 0;
+}
+.resourceTools details {
+  border: 1px solid #dfe6ef;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px 18px;
+  width: 100%;
+}
+.resourceTools summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 24px;
+}
+.researchResults {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+.researchResults article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-block: 12px;
+  border-top: 1px solid #e2e8f2;
+}
+.researchResults small {
+  display: block;
+  color: #61708a;
+  margin-top: 6px;
+}
+.recipientReview {
+  margin-bottom: 24px;
+  padding-block: 10px;
+  border-bottom: 1px solid #e2e8f2;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.recipientReview .liveMetric {
+  font-size: 13px;
+  gap: 12px;
+}
+.recipientReview small {
+  display: block;
+  font-size: 11px;
+  color: #61708a;
+}
+.recipientReview article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf1f7;
+  font-size: 13px;
+}
+.recipientReview article:last-child {
+  border-bottom: 0;
+}
+.recipientReview article > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.recipientReview article p {
+  font-size: 12px;
+  color: #61708a;
+  margin: 5px 0 0;
+  line-height: 1.6;
+}
+.resourceTools details[open] summary {
+  margin-bottom: 18px;
+}
+.researchPanel > p {
+  font-size: 13px;
+  line-height: 1.8;
+  margin-bottom: 0;
+  color: #61708a;
+}
+.researchPanel > p a {
+  color: #0757f6;
+  text-decoration: underline;
+}
+@media (max-width: 1100px) {
+  .appShell .appTop {
+    padding-inline: 24px;
+  }
+  .appShell .appMain {
+    padding: 28px 24px;
+  }
+  .appShell .pageHeader {
+    flex-wrap: wrap;
+  }
+  .appShell .headerActions {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 820px) {
+  .appShell {
+    display: block;
+  }
+  .appShell .appSide {
+    width: min(320px, calc(100vw - 32px));
+    background: #f7f9fdf0;
+    padding: 22px 16px max(18px, env(safe-area-inset-bottom));
+  }
+  .appShell .appTop {
+    min-height: 72px;
+    height: auto;
+    padding: 12px 16px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    gap: 10px;
+  }
+  .appShell .menuBtn {
+    margin: 0;
+    min-width: 44px;
+  }
+  .workspaceSearchTrigger {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  .workspaceSearchTrigger kbd {
+    display: none;
+  }
+  .workspaceSearchTrigger span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .workspaceTopActions {
+    gap: 4px;
+  }
+  .workspaceHelp {
+    width: 40px;
+    justify-content: center;
+  }
+  .workspaceHelp span {
+    display: none;
+  }
+  .workspaceAccount {
+    width: 38px;
+  }
+  .appShell .appMain {
+    padding: 24px 18px;
+  }
+  .appShell .pageHeader {
+    gap: 18px;
+    align-items: stretch;
+  }
+  .appShell .pageHeader h1 {
+    font-size: 28px;
+  }
+  .appShell .pageHeader p {
+    font-size: 14px;
+  }
+  .appShell .headerActions {
+    width: 100%;
+    gap: 10px;
+  }
+  .appShell .headerActions .btn {
+    flex: 1 1 auto;
+  }
+  .appShell .btn {
+    min-height: 44px;
+    font-size: 13px;
+  }
+  .appShell .navGroup a,
+  .appShell .sideBottom > a {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .appShell .field input,
+  .appShell .field select,
+  .appShell .field textarea,
+  .appShell .liveSearch > input {
+    font-size: 16px;
+  }
+  .appShell .livePanel,
+  .appShell .settingsForm {
+    padding: 20px;
+  }
+  .appShell .liveState {
+    padding: 36px 20px;
+  }
+  .appShell .liveRecords td {
+    font-size: 13px;
+  }
+  .appShell .liveRowActions button {
+    min-height: 44px;
+  }
+  .appShell .pagination button {
+    min-height: 44px;
+  }
+  .guideGrid {
+    grid-template-columns: 1fr;
+  }
+  .researchResults article {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .appShell .readinessPanel {
+    padding: 20px;
+  }
+  .appShell .diagnosisHero {
+    padding: 24px;
+  }
+  .appShell .diagnosisHero h2 {
+    font-size: 24px;
+  }
+  .appShell .diagnosisHero p {
+    font-size: 14px;
+  }
+  .appShell .liveTwoColumns {
+    gap: 18px;
+  }
+  .appShell .workspace select {
+    font-size: 16px;
+  }
+  .appShell .userChip b {
+    font-size: 13px;
+  }
+}
+@media (max-width: 380px) {
+  .appShell .appMain {
+    padding-inline: 14px;
+  }
+  .appShell .appTop {
+    padding-inline: 12px;
+    gap: 8px;
+  }
+  .workspaceHelp {
+    display: none;
+  }
+  .workspaceSearchTrigger {
+    font-size: 12px;
+  }
+  .appShell .pageHeader h1 {
+    font-size: 26px;
+  }
+}

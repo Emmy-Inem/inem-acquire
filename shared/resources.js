@@ -134,12 +134,4 @@ export function parseResource(resource, data, partial = false) {
       )
     : parsed;
 }
-export function canRole(role, action) {
-  return action === "read"
-    ? ["owner", "admin", "manager", "member", "viewer"].includes(role)
-    : action === "manage"
-      ? ["owner", "admin"].includes(role)
-      : action === "approve" || action === "delete"
-        ? ["owner", "admin", "manager"].includes(role)
-        : ["owner", "admin", "manager", "member"].includes(role);
-}
+export { canRole } from "./permissions.js";

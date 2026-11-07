@@ -85,7 +85,6 @@ The production website is https://inem-acquire.vercel.app. Set server environmen
 
 External services are intentionally not activated yet. The core app fails explicitly when a provider is unconfigured; it does not mark unsent email as sent or incomplete checkout as paid.
 
-- **Authentication email:** configure production SMTP in Supabase for general-user signup and reset delivery. Built-in Supabase email restrictions still apply until SMTP is configured.
 - **Temporary authentication sender:** Gmail SMTP is configured using the user's approved sending account, with host `smtp.gmail.com`, port `465`, and sender name `Inem Acquire`. The Google app password is stored only in Supabase, never in the repository. On 7 November 2026, live recovery-email sending and a disposable signup-email test succeeded. Live sign-in, verification enforcement, secure session cookies and bootstrap were also checked. Resend remains deferred until a user-owned sending domain is available. Routine password-reset integration checks generate real recovery links without sending email.
 - **Email:** server and Edge Function secrets `RESEND_API_KEY`, `OUTBOUND_FROM`; use a verified sender. Add `INBOUND_DOMAIN` for replies routed to `reply+<organization UUID>@<domain>`. On the Node server set `RESEND_WEBHOOK_SECRET`; register `/api/webhooks/resend` and route inbound mail in Resend. Only known contacts are associated with workspace messages. Unsubscribe replies are recorded as opt-outs.
 - **Billing:** set server-only `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_GROWTH`; register signed subscription events at `/api/webhooks/stripe`. Provider event IDs are deduplicated in the same database transaction as account updates; older events cannot overwrite newer state.
@@ -99,11 +98,16 @@ Delivery is explicit, approval-gated and idempotent per recipient. Ambiguous pro
 
 ## Verification
 
+The 7 November workspace audit added a consistent compact header, organization switching, account profile editing, workspace search, contact-list and campaign-recipient review/removal, provider-aware prospect research and the existing Stripe customer portal. The shared capability matrix denies unknown roles/actions. Database guards enforce organization membership for task assignments and prevent deleting sent or approved campaign history. Migration `202611070007_role_and_assignment_guards.sql` and `workspace-api` are deployed.
+
+The integration suite exercises all five organization roles, tenant isolation, assignment protection, draft-only recipient removal and time-limited audited platform support. Browser tests cover saved profile edits, filtered search results, list membership changes, viewer controls and selecting a newly created second organization. The mobile audit checks 84 route/viewport combinations at 320, 390 and 768px; it found no horizontal page overflow, small mobile form inputs or browser errors.
+
 ```sh
 npm test
 npm run test:integration
 node tests/browser.js
 node tests/password-reset.integration.js
+node tests/auth-session.browser.js
 ```
 
 Integration tests create and remove uniquely named fixture users and organizations in the configured project. They do not send emails, charge a card or run provider searches. Browser checks require installed Chrome and the local API/Vite servers. RLS, roles, cross-tenant references, support access, campaign approval, signature checks, cookies and real record persistence are covered. Production-provider delivery and payment capture remain untested until those services are activated.

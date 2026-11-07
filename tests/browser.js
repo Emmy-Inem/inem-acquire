@@ -14,6 +14,7 @@ await fs.mkdir(out, { recursive: true });
 const email = `acquire-qa-${Date.now()}-browser@example.com`,
   password = randomBytes(24).toString("base64url");
 let user, browser;
+const base = process.env.BROWSER_BASE_URL || "http://127.0.0.1:5173";
 const errors = [];
 const assert = (value, msg) => {
   if (!value) throw new Error(msg);
@@ -31,10 +32,11 @@ try {
   const page = await browser.newPage({
     viewport: { width: 1440, height: 900 },
     hasTouch: true,
+    timezoneId: "Africa/Lagos",
   });
   page.on("pageerror", (e) => errors.push(e.message));
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("http://127.0.0.1:5173/");
+  await page.goto(base + "/");
   const navigationToggle = page.getByRole("button", {
     name: "Toggle navigation",
   });
@@ -80,7 +82,7 @@ try {
     );
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("http://127.0.0.1:5173/app/dashboard");
+  await page.goto(base + "/app/dashboard");
   await page.waitForURL("**/login");
   assert(
     !(await page.getByText("Acme Technologies", { exact: true }).count()),
@@ -163,7 +165,7 @@ try {
     (await page.getByText("Browser Tester", { exact: true }).count()) >= 1,
     "Profile is missing",
   );
-  await page.goto("http://127.0.0.1:5173/app/admin");
+  await page.goto(base + "/app/admin");
   await page
     .getByRole("heading", { name: "Platform owner access required" })
     .waitFor();
@@ -183,7 +185,7 @@ try {
     .waitFor();
   await page.screenshot({ path: out + "/owner-1440x900.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("http://127.0.0.1:5173/app/dashboard");
+  await page.goto(base + "/app/dashboard");
   await page
     .getByRole("heading", { name: "Your acquisition overview" })
     .waitFor();
@@ -251,7 +253,7 @@ try {
     (await page.locator(".appSide").getAttribute("inert")) !== null,
     "Manage menu links do not close drawer",
   );
-  await page.goto("http://127.0.0.1:5173/app/admin");
+  await page.goto(base + "/app/admin");
   await page
     .getByRole("heading", { name: "Platform owner", exact: true })
     .waitFor();
@@ -266,11 +268,221 @@ try {
     "Platform owner console overflows on mobile",
   );
   await page.screenshot({ path: out + "/owner-390x844.png", fullPage: true });
+  await page
+    .getByRole("button", { name: "Search workspace", exact: true })
+    .click();
+  const searchDialog = page.getByRole("dialog", {
+    name: "Search your workspace",
+  });
+  await searchDialog.getByRole("searchbox").fill("Test Contact");
+  await searchDialog
+    .getByRole("link", { name: "Test Contact", exact: true })
+    .click();
+  await page.getByRole("cell", { name: "Test Contact", exact: true }).waitFor();
+  assert(
+    new URL(page.url()).searchParams.get("search") === "Test Contact",
+    "Search did not open filtered records",
+  );
+  await page.getByRole("link", { name: "Your account and settings" }).click();
+  await page
+    .getByLabel("Full name", { exact: true })
+    .fill("Browser Profile Updated");
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await page.getByText("Profile saved.", { exact: true }).waitFor();
+  await page.reload();
+  assert(
+    (await page.getByLabel("Full name", { exact: true }).inputValue()) ===
+      "Browser Profile Updated",
+    "Profile update did not persist",
+  );
+  const currentOrg = await page.evaluate(() =>
+    localStorage.getItem("acquire.organization"),
+  );
+  const fixture = await page.request.post(base + "/api/resources/lists", {
+    headers: {
+      "x-organization-id": currentOrg,
+      Origin: base + "",
+    },
+    data: { name: "Browser working list" },
+  });
+  assert(fixture.ok(), "List fixture failed: " + fixture.status());
+  await page.goto(base + "/app/lists");
+  await page
+    .getByRole("row")
+    .filter({ hasText: "Browser working list" })
+    .getByRole("button", { name: "Contacts", exact: true })
+    .click();
+  const listDialog = page.getByRole("dialog", { name: "List contacts" });
+  await listDialog.waitFor();
+  await page.screenshot({ path: out + "/list-dialog.png", fullPage: true });
+  await listDialog
+    .getByText("Loading contacts…", { exact: true })
+    .waitFor({ state: "hidden" });
+  assert(
+    (await listDialog.getByLabel("Contact", { exact: true }).count()) === 1,
+    "List editor unavailable: " + (await listDialog.innerText()),
+  );
+  await listDialog
+    .getByLabel("Contact", { exact: true })
+    .selectOption({ label: "Test Contact · test@example.com · Unknown" });
+  await page.keyboard.press("Control+k");
+  assert(
+    (await page
+      .getByRole("dialog", { name: "Search your workspace" })
+      .count()) === 0,
+    "Search opened over another modal",
+  );
+  await listDialog
+    .getByLabel("Find a contact", { exact: true })
+    .fill("No match");
+  assert(
+    await listDialog
+      .getByRole("button", { name: "Add contact", exact: true })
+      .isDisabled(),
+    "Filtered-out contact can still be submitted",
+  );
+  await listDialog.getByLabel("Find a contact", { exact: true }).fill("");
+  await listDialog
+    .getByLabel("Contact", { exact: true })
+    .selectOption({ label: "Test Contact · test@example.com · Unknown" });
+  await listDialog
+    .getByRole("button", { name: "Add contact", exact: true })
+    .click();
+  await listDialog.getByText("Test Contact", { exact: true }).waitFor();
+  await listDialog.getByRole("button", { name: "Remove", exact: true }).click();
+  await listDialog
+    .getByText("No contacts added yet.", { exact: true })
+    .waitFor();
+  await listDialog.getByRole("button", { name: "Close", exact: true }).click();
+  await page.goto(base + "/app/prospects");
+  await page.getByText("Research new companies", { exact: true }).click();
+  await page
+    .getByText("External research needs an Apollo connection.", {
+      exact: false,
+    })
+    .waitFor();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForFunction(
+    () =>
+      document.querySelector(".appSide")?.getBoundingClientRect().left === 0,
+  );
+  await page.locator('.liveState[role="status"]').waitFor({ state: "hidden" });
+  await page.screenshot({
+    path: out + "/workspace-updated-1440x900.png",
+    fullPage: true,
+  });
+  const roleChanged = await db
+    .from("memberships")
+    .update({ role: "viewer" })
+    .eq("organization_id", currentOrg)
+    .eq("user_id", user.id);
+  assert(!roleChanged.error, "Viewer fixture update failed");
+  await page.reload();
+  await page
+    .getByRole("heading", { name: "Prospect discovery", exact: true })
+    .waitFor();
+  assert(
+    (await page
+      .getByRole("button", { name: "Add prospect", exact: true })
+      .count()) === 0,
+    "Viewer sees a create action",
+  );
+  await page.goto(base + "/app/team");
+  await page
+    .getByRole("heading", { name: "Team & roles", exact: true })
+    .waitFor();
+  assert(
+    (await page
+      .getByRole("button", { name: "Create invitation link", exact: true })
+      .count()) === 0,
+    "Viewer sees invitation management",
+  );
+  await page.goto(base + "/app/integrations");
+  await page.getByText("Prospect enrichment", { exact: true }).waitFor();
+  const roleRestored = await db
+    .from("memberships")
+    .update({ role: "owner" })
+    .eq("organization_id", currentOrg)
+    .eq("user_id", user.id);
+  assert(!roleRestored.error, "Owner fixture restore failed");
+  await page.goto(base + "/app/tasks");
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  let taskDialog = page.getByRole("dialog");
+  await taskDialog
+    .getByLabel("Task", { exact: true })
+    .fill("Browser assigned follow-up");
+  await taskDialog
+    .getByLabel("Assigned to", { exact: true })
+    .selectOption(user.id);
+  await taskDialog
+    .getByLabel("Due date", { exact: true })
+    .fill("2026-11-10T14:30");
+  await taskDialog
+    .getByRole("button", { name: "Save record", exact: true })
+    .click();
+  await page
+    .getByRole("row")
+    .filter({ hasText: "Browser assigned follow-up" })
+    .getByRole("button", { name: "Edit", exact: true })
+    .click();
+  taskDialog = page.getByRole("dialog");
+  await taskDialog
+    .getByLabel("Assigned to", { exact: true })
+    .locator('option[value="' + user.id + '"]')
+    .waitFor({ state: "attached" });
+  assert(
+    (await taskDialog.getByLabel("Due date", { exact: true }).inputValue()) ===
+      "2026-11-10T14:30",
+    "Editing shifted the local task time",
+  );
+  assert(
+    (await taskDialog
+      .getByLabel("Assigned to", { exact: true })
+      .inputValue()) === user.id,
+    "Task assignee did not persist",
+  );
+  await taskDialog
+    .getByRole("button", { name: "Save record", exact: true })
+    .click();
+  await taskDialog.waitFor({ state: "hidden" });
+  const persistedTask = await db
+    .from("tasks")
+    .select("due_at,assigned_to")
+    .eq("organization_id", currentOrg)
+    .eq("title", "Browser assigned follow-up")
+    .single();
+  assert(
+    !persistedTask.error &&
+      new Date(persistedTask.data.due_at).toISOString() ===
+        "2026-11-10T13:30:00.000Z",
+    "Saving unchanged corrupted the task due time",
+  );
+  await page.goto(base + "/onboarding/welcome");
+  const secondName = "QA organization browser second " + user.id.slice(0, 6);
+  await page.getByLabel("Organization name", { exact: true }).fill(secondName);
+  await page
+    .getByRole("button", { name: "Create workspace", exact: true })
+    .click();
+  await page.waitForURL("**/app/dashboard");
+  await page
+    .getByLabel("Organization", { exact: true })
+    .getByRole("option", { name: secondName, exact: true })
+    .waitFor({ state: "attached" });
+  assert(
+    (await page
+      .getByLabel("Organization", { exact: true })
+      .locator("option:checked")
+      .innerText()) === secondName,
+    "New organization reverted to the old selection",
+  );
+  console.log(
+    "PASS workspace search, saved profile, list membership, viewer controls, connection state and second-organization selection",
+  );
   const reduced = await browser.newPage({
     viewport: { width: 390, height: 844 },
     reducedMotion: "reduce",
   });
-  await reduced.goto("http://127.0.0.1:5173/");
+  await reduced.goto(base + "/");
   assert(
     (await reduced.locator("video source").count()) === 0,
     "Reduced motion downloads background video",

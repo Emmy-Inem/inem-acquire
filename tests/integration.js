@@ -110,6 +110,11 @@ try {
   });
   assert.equal(badContact.status, 400);
   check("composite tenant foreign keys reject cross-organization links");
+  const foreignAssignee = await post(a, "/resources/tasks", a.org, {
+    title: "Invalid foreign assignee", assigned_to: b.id,
+  });
+  assert.equal(foreignAssignee.status, 400);
+  check("tasks cannot be assigned to profiles outside their organization");
   ok(
     await admin
       .from("memberships")
@@ -124,6 +129,24 @@ try {
     .set("x-organization-id", a.org);
   assert.equal(viewerRead.status, 200);
   check("viewer role reads records but cannot mutate them");
+  for (const [role, capabilities] of [
+    ["member", { read: true, write: true, approve: false, manage: false }],
+    ["manager", { read: true, write: true, approve: true, manage: false }],
+    ["admin", { read: true, write: true, approve: true, manage: true }],
+  ]) {
+    ok(await admin.from("memberships").update({ role }).eq("organization_id", a.org).eq("user_id", b.id));
+    assert.deepEqual(ok(await b.db.rpc("organization_permissions", { org: a.org })), capabilities);
+    const ownTask = await post(b, "/resources/tasks", a.org, {
+      title: "Role check " + role, assigned_to: b.id,
+    });
+    assert.equal(ownTask.status, 201, ownTask.body.error);
+    ok(await admin.from("tasks").delete().eq("id", ownTask.body.data.id).eq("organization_id", a.org));
+    const roleEscalation = await b.agent.patch("/api/team/" + b.id)
+      .set("Origin", origin).set("x-organization-id", a.org).send({ role: "admin" });
+    assert.equal(roleEscalation.status, role === "admin" ? 400 : 403);
+  }
+  ok(await admin.from("memberships").update({ role: "viewer" }).eq("organization_id", a.org).eq("user_id", b.id));
+  check("member, manager and admin permissions match the role matrix and prevent escalation");
   const escalation = await a.agent
     .patch("/api/team/" + b.id)
     .set("Origin", origin)
@@ -162,6 +185,52 @@ try {
     body: "This is a test draft, never sent.",
   });
   assert.equal(campaign.status, 201, campaign.body.error);
+  const disposableCampaign = await post(a, "/resources/campaigns", a.org, {
+    name: "Disposable draft", subject: "Never sent", body: "Draft deletion check",
+  });
+  assert.equal(disposableCampaign.status, 201, disposableCampaign.body.error);
+  const deleteCampaign = (actor, id, organization = a.org) => actor.agent
+    .delete("/api/resources/campaigns/" + id).set("Origin", origin)
+    .set("x-organization-id", organization);
+  assert.equal((await deleteCampaign(b, disposableCampaign.body.data.id)).status, 403);
+  const deletedDraft = await deleteCampaign(a, disposableCampaign.body.data.id);
+  assert.equal(deletedDraft.status, 200, deletedDraft.body.error);
+  assert.equal((await deleteCampaign(a, disposableCampaign.body.data.id)).status, 404);
+  check("only authorized managers can delete an unsent draft campaign");
+  const historyCampaign = await post(a, "/resources/campaigns", a.org, {
+    name: "Delivery history guard", subject: "Never sent", body: "Synthetic test history",
+  });
+  assert.equal(historyCampaign.status, 201, historyCampaign.body.error);
+  const historyContact = ok(await admin.from("contacts").insert({
+    organization_id: a.org, full_name: "Synthetic recipient",
+  }).select("id").single());
+  const historyRecipient = ok(await admin.from("campaign_recipients").insert({
+    organization_id: a.org, campaign_id: historyCampaign.body.data.id,
+    contact_id: historyContact.id, status: "failed",
+  }).select("id").single());
+  assert.equal((await deleteCampaign(a, historyCampaign.body.data.id)).status, 409);
+  check("drafts with previous delivery attempts cannot erase recipient history");
+  const removeRecipient = (actor, id, organization = a.org) => actor.agent
+    .delete("/api/resources/campaign_recipients/" + id).set("Origin", origin)
+    .set("x-organization-id", organization);
+  const makeRecipient = async () => {
+    const added = await post(a, "/resources/campaign_recipients", a.org, {
+      campaign_id: campaign.body.data.id, contact_id: historyContact.id,
+    });
+    assert.equal(added.status, 201, added.body.error);
+    return added.body.data.id;
+  };
+  const removable = await makeRecipient();
+  assert.equal((await removeRecipient(b, removable)).status, 403);
+  assert.equal((await removeRecipient(b, removable, b.org)).status, 404);
+  ok(await admin.from("memberships").update({ role: "member" }).eq("organization_id", a.org).eq("user_id", b.id));
+  const removedRecipient = await removeRecipient(b, removable);
+  assert.equal(removedRecipient.status, 200, removedRecipient.body.error);
+  assert.equal((await removeRecipient(b, removable)).status, 404);
+  ok(await admin.from("memberships").update({ role: "viewer" }).eq("organization_id", a.org).eq("user_id", b.id));
+  assert.equal((await removeRecipient(a, historyRecipient.id)).status, 409);
+  const protectedRecipient = await makeRecipient();
+  check("writers can remove pending draft recipients; viewers, foreign tenants and delivery history are protected");
   const injected = await a.agent
     .patch("/api/resources/campaigns/" + campaign.body.data.id)
     .set("Origin", origin)
@@ -175,6 +244,10 @@ try {
     {},
   );
   assert.equal(approval.status, 200, approval.body.error);
+  const approvedDelete = await deleteCampaign(a, campaign.body.data.id);
+  assert.equal(approvedDelete.status, 409, approvedDelete.body.error);
+  assert.equal((await removeRecipient(a, protectedRecipient)).status, 409);
+  check("campaign deletion preserves approved campaigns");
   const changed = await a.agent
     .patch("/api/resources/campaigns/" + campaign.body.data.id)
     .set("Origin", origin)

@@ -5,7 +5,7 @@ const request=z.object({organization_id:z.string().uuid(),action:z.enum(['list',
 Deno.serve(async req=>{try{
  if(req.method!=='POST')throw new HttpError(405,'POST required');const {db,admin,user}=await context(req);const input=request.parse(await req.json());const {organization_id:org,resource,action,id}=input;
  if(!readResources.includes(resource))throw new HttpError(404,'Resource not found');
- await permission(db,org,action==='list'?'read':action==='delete'?'approve':'write');
+ await permission(db,org,action==='list'?'read':action==='delete'&&resource!=='campaign_recipients'?'approve':'write');
  if(resource==='audit_events')await permission(db,org,'manage');
  if(action==='list'){
   let query=db.from(resource).select('*',{count:'exact'}).eq('organization_id',org);
@@ -14,7 +14,9 @@ Deno.serve(async req=>{try{
  }
  if(action==='delete'){
   if(!id)throw new HttpError(400,'Record ID required');if(!Object.hasOwn((await import('../../../shared/resources.js')).resourceSchemas,resource))throw new HttpError(403,'This resource is managed by the platform');
-  if(serviceWriteResources.includes(resource))throw new HttpError(403,'Campaign records cannot be removed here');
+  if(resource==='campaigns'){checked(await db.rpc('delete_draft_campaign',{campaign:id,campaign_org:org}));return json({success:true});}
+  if(resource==='campaign_recipients'){checked(await db.rpc('remove_draft_campaign_recipient',{recipient:id,recipient_org:org}));return json({success:true});}
+  if(serviceWriteResources.includes(resource))throw new HttpError(403,'Campaign recipients are managed by delivery');
   const result=await db.from(resource).delete().eq('organization_id',org).eq('id',id).select('id');checked(result);if(!result.data?.length)throw new HttpError(404,'Record not found');return json({success:true});
  }
  const data=parseResource(resource,input.data||{},action==='update');

@@ -6,6 +6,7 @@ import {
   NavLink,
   Navigate,
   useNavigate,
+  useLocation,
   useParams,
 } from "react-router-dom";
 import {
@@ -41,6 +42,12 @@ import { useAuth } from "./AuthContext";
 import { LiveBrand } from "./AuthPages";
 import { canRole } from "../../shared/permissions";
 import { AnimatedPreview } from "../PlatformMotion";
+import WorkspaceSearch from "./WorkspaceSearch";
+import AccountSettings from "./AccountSettings";
+import WorkspaceGuide from "./WorkspaceGuide";
+import ProspectResearch from "./ProspectResearch";
+import { toLocalDateTime } from "./dateTime";
+import { assignableRoles, canManageMember } from "../../shared/permissions";
 
 const navigation = [
   [
@@ -188,6 +195,7 @@ const modules = {
     fields: [
       ["title", "Task", "text", true],
       ["deal_id", "Related deal", "deals"],
+      ["assigned_to", "Assigned to", "team"],
       ["priority", "Priority", "select", ["low", "medium", "high"]],
       ["due_at", "Due date", "datetime-local"],
       ["status", "Status", "select", ["open", "done"]],
@@ -276,7 +284,10 @@ export function LiveWorkspace() {
   const params = useParams(),
     navigate = useNavigate();
   const section = (params["*"] || "dashboard").split("/")[0];
+  const routeLocation = useLocation();
   const [mobile, setMobile] = useState(false);
+  const [shellError, setShellError] = useState("");
+  const [endingSupport, setEndingSupport] = useState(false);
   const compact = useMediaQuery("(max-width: 820px)");
   const navigationRef = useRef(null);
   useDialogFocus(mobile && compact, () => setMobile(false), navigationRef);
@@ -338,6 +349,10 @@ export function LiveWorkspace() {
             ))}
           </select>
         </label>
+        <Link className="createWorkspaceLink" to="/onboarding/welcome">
+          <Plus size={16} />
+          Create organization
+        </Link>
         <nav>
           {navigation.map(([group, items]) => (
             <div className="navGroup" key={group}>
@@ -356,10 +371,12 @@ export function LiveWorkspace() {
           ))}
           <div className="navGroup">
             <small>Manage</small>
-            <NavLink to="/app/audit">
-              <ShieldCheck />
-              Audit trail
-            </NavLink>
+            {manage && (
+              <NavLink to="/app/audit">
+                <ShieldCheck />
+                Audit trail
+              </NavLink>
+            )}
             <NavLink to="/app/team">
               <Users />
               Team & roles
@@ -384,6 +401,10 @@ export function LiveWorkspace() {
           <NavLink to="/app/settings">
             <Settings /> Settings
           </NavLink>
+          <NavLink to="/app/guide">
+            <Lightbulb />
+            Workspace guide
+          </NavLink>
           <div className="userChip">
             <span className="avatar">{initials}</span>
             <span>
@@ -397,7 +418,7 @@ export function LiveWorkspace() {
               onClick={() =>
                 logout()
                   .then(() => navigate("/login"))
-                  .catch(() => {})
+                  .catch((e) => setShellError(e.message))
               }
             >
               <LogOut size={17} />
@@ -416,15 +437,26 @@ export function LiveWorkspace() {
           >
             <Menu />
           </button>
-          <div className="liveBreadcrumb">
-            {organization?.name || "Platform administration"}
-            <span>{titleCase(section)}</span>
+          <WorkspaceSearch />
+          <div className="workspaceTopActions">
+            <Link className="workspaceHelp" to="/app/guide">
+              <Lightbulb size={18} />
+              <span>Guide</span>
+            </Link>
+            <Link
+              className="workspaceAccount"
+              to="/app/settings"
+              aria-label="Your account and settings"
+            >
+              <span className="avatar">{initials}</span>
+            </Link>
           </div>
-          <Link className="btn secondary" to="/onboarding/welcome">
-            <Plus size={16} />
-            New organization
-          </Link>
         </header>
+        {shellError && (
+          <p className="liveError" role="alert">
+            {shellError}
+          </p>
+        )}
         {organization?.support && (
           <div className="supportBanner" role="status">
             <ShieldCheck size={17} />
@@ -434,27 +466,50 @@ export function LiveWorkspace() {
               <small>{organization.support.reason}</small>
             </span>
             <button
+              disabled={endingSupport}
               onClick={async () => {
-                await api("/platform/support/" + organization.id, {
-                  method: "DELETE",
-                  body: {},
-                });
-                await refresh();
-                navigate("/app/admin");
+                setEndingSupport(true);
+                setShellError("");
+                try {
+                  await api("/platform/support/" + organization.id, {
+                    method: "DELETE",
+                    body: {},
+                  });
+                  await refresh();
+                  navigate("/app/admin");
+                } catch (e) {
+                  setShellError(e.message);
+                } finally {
+                  setEndingSupport(false);
+                }
               }}
             >
               End support session
             </button>
           </div>
         )}
-        <main className="appMain" key={section + organization?.id}>
+        <main
+          className="appMain"
+          key={section + organization?.id + routeLocation.search}
+        >
           {section === "dashboard" || section === "analytics" ? (
             <Overview analytics={section === "analytics"} {...props} />
           ) : section === "diagnosis" ? (
             <DiagnosisPage {...props} />
           ) : section === "pipeline" ? (
             <PipelinePage {...props} />
-          ) : section === "company" || section === "settings" ? (
+          ) : section === "settings" ? (
+            <>
+              <Header
+                title="Settings"
+                description="Your account and organization preferences."
+              />
+              <AccountSettings />
+              <CompanyPage {...props} embedded />
+            </>
+          ) : section === "guide" ? (
+            <WorkspaceGuide />
+          ) : section === "company" ? (
             <CompanyPage {...props} />
           ) : section === "audit" ? (
             <AuditView />
@@ -510,7 +565,7 @@ function RecordForm({ resource, record, onClose, onSaved }) {
       if (resource === "icps") Object.assign(v, record?.criteria || {});
       if (resource === "reports")
         v.description = record?.definition?.description || "";
-      if (v.due_at) v.due_at = new Date(v.due_at).toISOString().slice(0, 16);
+      if (v.due_at) v.due_at = toLocalDateTime(v.due_at);
       return v;
     }),
     [references, setReferences] = useState({}),
@@ -525,13 +580,21 @@ function RecordForm({ resource, record, onClose, onSaved }) {
       [
         ...new Set(
           config.fields
-            .filter((f) => ["offers", "prospects", "deals"].includes(f[2]))
+            .filter((f) =>
+              ["offers", "prospects", "deals", "team"].includes(f[2]),
+            )
             .map((f) => f[2]),
         ),
       ].map(async (table) => [
         table,
-        (await request("/resources/" + table, { signal: controller.signal }))
-          .data,
+        table === "team"
+          ? (await request("/team", { signal: controller.signal })).members.map(
+              (m) => ({
+                id: m.user_id,
+                name: m.profiles?.full_name || "Team member",
+              }),
+            )
+          : await readAllRecords(request, table, { signal: controller.signal }),
       ]),
     )
       .then((entries) => setReferences(Object.fromEntries(entries)))
@@ -580,6 +643,7 @@ function RecordForm({ resource, record, onClose, onSaved }) {
                     "offers",
                     "prospects",
                     "deals",
+                    "team",
                     "url",
                     "date",
                     "email",
@@ -637,6 +701,7 @@ function RecordForm({ resource, record, onClose, onSaved }) {
                 />
               ) : type === "select" ? (
                 <select
+                  aria-label={label}
                   value={values[key] || requiredOrOptions[0]}
                   onChange={(e) =>
                     setValues({ ...values, [key]: e.target.value })
@@ -648,14 +713,18 @@ function RecordForm({ resource, record, onClose, onSaved }) {
                     </option>
                   ))}
                 </select>
-              ) : ["offers", "prospects", "deals"].includes(type) ? (
+              ) : ["offers", "prospects", "deals", "team"].includes(type) ? (
                 <select
+                  aria-label={label}
+                  disabled={!references[type]}
                   value={values[key] || ""}
                   onChange={(e) =>
                     setValues({ ...values, [key]: e.target.value })
                   }
                 >
-                  <option value="">Not linked</option>
+                  <option value="">
+                    {references[type] ? "Not linked" : "Loading choices…"}
+                  </option>
                   {(references[type] || []).map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name || r.title}
@@ -704,15 +773,22 @@ function ResourcePage({ resource, write, approve }) {
   const [rows, setRows] = useState([]),
     [count, setCount] = useState(0),
     [offset, setOffset] = useState(0),
-    [search, setSearch] = useState(""),
-    [query, setQuery] = useState(""),
+    [search, setSearch] = useState(
+      () => new URLSearchParams(window.location.search).get("search") || "",
+    ),
+    [query, setQuery] = useState(
+      () => new URLSearchParams(window.location.search).get("search") || "",
+    ),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [editing, setEditing] = useState(null),
     [notice, setNotice] = useState(""),
     [deleting, setDeleting] = useState(""),
-    [selected, setSelected] = useState("");
+    [selected, setSelected] = useState(""),
+    [actionPending, setActionPending] = useState(false);
+  const loadVersion = useRef(0);
   const load = useCallback(async () => {
+    const version = ++loadVersion.current;
     setLoading(true);
     setError("");
     try {
@@ -724,18 +800,25 @@ function ResourcePage({ resource, write, approve }) {
           "&search=" +
           encodeURIComponent(query),
       );
-      setRows(r.data);
-      setCount(r.count);
+      if (version === loadVersion.current) {
+        setRows(r.data);
+        setCount(r.count);
+      }
     } catch (e) {
-      setError(e.message);
+      if (version === loadVersion.current) setError(e.message);
     } finally {
-      setLoading(false);
+      if (version === loadVersion.current) setLoading(false);
     }
   }, [request, resource, offset, query]);
   useEffect(() => {
     load();
+    return () => {
+      loadVersion.current++;
+    };
   }, [load]);
   const action = async (id, type) => {
+    if (actionPending) return;
+    setActionPending(true);
     setError("");
     try {
       const r = await request("/campaigns/" + id + "/" + type, {
@@ -750,6 +833,8 @@ function ResourcePage({ resource, write, approve }) {
       await load();
     } catch (e) {
       setError(e.message);
+    } finally {
+      setActionPending(false);
     }
   };
   const exportData = async () => {
@@ -797,7 +882,15 @@ function ResourcePage({ resource, write, approve }) {
           {notice}
         </div>
       )}
-      {resource === "prospects" && write && <CsvImport onImported={load} />}
+      {resource === "prospects" && write && (
+        <div className="resourceTools">
+          <details>
+            <summary>Import companies from CSV</summary>
+            <CsvImport onImported={load} />
+          </details>
+          <ProspectResearch onSaved={load} />
+        </div>
+      )}
       <form
         className="liveSearch"
         onSubmit={(e) => {
@@ -855,20 +948,25 @@ function ResourcePage({ resource, write, approve }) {
                         {write && (
                           <button onClick={() => setEditing(row)}>Edit</button>
                         )}
-                        {approve && (
-                          <button onClick={() => setDeleting(row.id)}>
-                            Delete
-                          </button>
-                        )}
+                        {approve &&
+                          (resource !== "campaigns" ||
+                            row.status === "draft") && (
+                            <button onClick={() => setDeleting(row.id)}>
+                              Delete
+                            </button>
+                          )}
                         {resource === "campaigns" && (
                           <>
-                            {write && row.status === "draft" && (
+                            {
                               <button onClick={() => setSelected(row.id)}>
                                 Recipients
                               </button>
-                            )}
+                            }
                             {approve && row.status === "draft" && (
-                              <button onClick={() => action(row.id, "approve")}>
+                              <button
+                                disabled={actionPending}
+                                onClick={() => action(row.id, "approve")}
+                              >
                                 Approve
                               </button>
                             )}
@@ -883,9 +981,9 @@ function ResourcePage({ resource, write, approve }) {
                             )}
                           </>
                         )}
-                        {resource === "lists" && write && (
+                        {resource === "lists" && (
                           <button onClick={() => setSelected(row.id)}>
-                            Add contact
+                            Contacts
                           </button>
                         )}
                       </div>
@@ -937,7 +1035,9 @@ function ResourcePage({ resource, write, approve }) {
                 method: "DELETE",
               });
               setDeleting("");
-              load();
+              if (rows.length === 1 && offset > 0)
+                setOffset(Math.max(0, offset - 25));
+              else load();
             } catch (e) {
               setDeleting("");
               setError(e.message);
@@ -961,8 +1061,14 @@ function ResourcePage({ resource, write, approve }) {
           <ContactPicker
             resource={resource}
             parentId={selected}
+            editable={
+              write &&
+              (resource === "lists" ||
+                rows.find((row) => row.id === selected)?.status === "draft")
+            }
+            canRemove={resource === "campaigns" ? write : approve}
             onClose={() => setSelected("")}
-            onSaved={() => setNotice("Contact added.")}
+            onSaved={() => setNotice("Contact list updated.")}
           />
         )
       )}
@@ -1011,27 +1117,66 @@ function Confirm({ title, detail, onCancel, onConfirm }) {
     </div>
   );
 }
-function ContactPicker({ resource, parentId, onClose, onSaved }) {
+async function readAllRecords(request, resource, options = {}) {
+  let rows = [],
+    offset = 0;
+  while (true) {
+    const page = await request(
+      `/resources/${resource}?limit=100&offset=${offset}`,
+      options,
+    );
+    rows = rows.concat(page.data);
+    if (rows.length >= page.count || !page.data.length) return rows;
+    offset += 100;
+  }
+}
+function ContactPicker({
+  resource,
+  parentId,
+  editable,
+  canRemove,
+  onClose,
+  onSaved,
+}) {
   useDialogFocus(true, onClose);
   const request = useOrgApi();
   const [contacts, setContacts] = useState([]),
     [id, setId] = useState(""),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [members, setMembers] = useState([]),
+    [search, setSearch] = useState(""),
+    [pending, setPending] = useState(false),
+    [loading, setLoading] = useState(true);
+  const child = resource === "lists" ? "list_contacts" : "campaign_recipients";
+  const parentField = resource === "lists" ? "list_id" : "campaign_id";
+  const load = useCallback(async () => {
+    const [people, membership] = await Promise.all([
+      readAllRecords(request, "contacts"),
+      readAllRecords(request, child),
+    ]);
+    setContacts(people);
+    setMembers(membership.filter((row) => row[parentField] === parentId));
+    setError("");
+  }, [request, child, parentField, parentId]);
   useEffect(() => {
-    request("/resources/contacts?limit=100")
-      .then((r) => setContacts(r.data))
-      .catch((e) => setError(e.message));
-  }, [request]);
+    load()
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [load]);
   return (
     <div className="liveModalBackdrop">
       <section
         className="panel liveModal"
         role="dialog"
         aria-modal="true"
-        aria-label="Add contact"
+        aria-label={
+          resource === "lists" ? "List contacts" : "Campaign recipients"
+        }
       >
         <header>
-          <h2>Add contact</h2>
+          <h2>
+            {resource === "lists" ? "List contacts" : "Campaign recipients"}
+          </h2>
           <button onClick={onClose} aria-label="Close">
             <X />
           </button>
@@ -1041,45 +1186,133 @@ function ContactPicker({ resource, parentId, onClose, onSaved }) {
             {error}
           </p>
         )}
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            try {
-              await request(
-                "/resources/" +
-                  (resource === "lists"
-                    ? "list_contacts"
-                    : "campaign_recipients"),
-                {
-                  method: "POST",
-                  body: {
-                    [resource === "lists" ? "list_id" : "campaign_id"]:
-                      parentId,
-                    contact_id: id,
+        {loading ? (
+          <p role="status">Loading contacts…</p>
+        ) : (
+          <div className="recipientReview">
+            {!members.length ? (
+              <p>No contacts added yet.</p>
+            ) : (
+              members.map((member) => {
+                const person = contacts.find((c) => c.id === member.contact_id);
+                return (
+                  <article key={member.id}>
+                    <div>
+                      <strong>
+                        {person?.full_name || "Contact unavailable"}
+                      </strong>
+                      <p>
+                        {person?.email || "No email"} ·{" "}
+                        {titleCase(
+                          member.status || person?.consent_status || "unknown",
+                        )}
+                      </p>
+                    </div>
+                    {editable && canRemove && (
+                      <button
+                        className="btn secondary"
+                        disabled={pending}
+                        onClick={async () => {
+                          setPending(true);
+                          setError("");
+                          try {
+                            await request(
+                              "/resources/" + child + "/" + member.id,
+                              { method: "DELETE" },
+                            );
+                            await load();
+                            onSaved();
+                          } catch (e) {
+                            setError(e.message);
+                          } finally {
+                            setPending(false);
+                          }
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </article>
+                );
+              })
+            )}
+          </div>
+        )}
+        {editable && !loading && (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setPending(true);
+              setError("");
+              try {
+                await request(
+                  "/resources/" +
+                    (resource === "lists"
+                      ? "list_contacts"
+                      : "campaign_recipients"),
+                  {
+                    method: "POST",
+                    body: {
+                      [resource === "lists" ? "list_id" : "campaign_id"]:
+                        parentId,
+                      contact_id: id,
+                    },
                   },
-                },
-              );
-              onSaved();
-              onClose();
-            } catch (e) {
-              setError(e.message);
-            }
-          }}
-        >
-          <label className="field">
-            <span>Contact</span>
-            <select required value={id} onChange={(e) => setId(e.target.value)}>
-              <option value="">Select a contact</option>
-              {contacts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.full_name} · {c.email || "No email"} ·{" "}
-                  {titleCase(c.consent_status)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="btn primary">Add contact</button>
-        </form>
+                );
+                onSaved();
+                setId("");
+                await load();
+              } catch (e) {
+                setError(e.message);
+              } finally {
+                setPending(false);
+              }
+            }}
+          >
+            <label className="field">
+              <span>Find a contact</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setId("");
+                }}
+                placeholder="Search name or email"
+              />
+            </label>
+            <label className="field">
+              <span>Contact</span>
+              <select
+                required
+                aria-label="Contact"
+                value={id}
+                onChange={(e) => setId(e.target.value)}
+              >
+                <option value="">Select a contact</option>
+                {contacts
+                  .filter(
+                    (c) =>
+                      !members.some((m) => m.contact_id === c.id) &&
+                      (!search ||
+                        [c.full_name, c.email]
+                          .join(" ")
+                          .toLowerCase()
+                          .includes(search.toLowerCase())),
+                  )
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.full_name} · {c.email || "No email"} ·{" "}
+                      {titleCase(c.consent_status)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button className="btn primary" disabled={pending || !id}>
+              {pending ? "Saving…" : "Add contact"}
+            </button>
+          </form>
+        )}
       </section>
     </div>
   );
@@ -1137,7 +1370,10 @@ function Overview({ analytics, write }) {
   const load = useCallback(
     () =>
       request("/dashboard")
-        .then(setData)
+        .then((result) => {
+          setData(result);
+          setError("");
+        })
         .catch((e) => setError(e.message)),
     [request],
   );
@@ -1222,7 +1458,7 @@ function Overview({ analytics, write }) {
           </article>
           <article className="panel livePanel">
             <h2>Next actions</h2>
-            {!(r.tasks || []).length ? (
+            {!(r.tasks || []).some((t) => t.status === "open") ? (
               <p>
                 No tasks yet. Add a follow-up to keep your next opportunity
                 moving.
@@ -1237,11 +1473,15 @@ function Overview({ analytics, write }) {
                       <button
                         aria-label={"Complete " + t.title}
                         onClick={async () => {
-                          await request("/resources/tasks/" + t.id, {
-                            method: "PATCH",
-                            body: { status: "done" },
-                          });
-                          load();
+                          try {
+                            await request("/resources/tasks/" + t.id, {
+                              method: "PATCH",
+                              body: { status: "done" },
+                            });
+                            load();
+                          } catch (e) {
+                            setError(e.message);
+                          }
                         }}
                       >
                         <Check size={15} />
@@ -1277,8 +1517,11 @@ function PipelinePage({ write }) {
     [error, setError] = useState("");
   const load = useCallback(
     () =>
-      request("/resources/deals?limit=100")
-        .then((r) => setRows(r.data))
+      readAllRecords(request, "deals")
+        .then((rows) => {
+          setRows(rows);
+          setError("");
+        })
         .catch((e) => setError(e.message)),
     [request],
   );
@@ -1374,7 +1617,10 @@ function DiagnosisPage({ write }) {
   const load = useCallback(
     () =>
       request("/resources/diagnoses")
-        .then((r) => setRows(r.data))
+        .then((r) => {
+          setRows(r.data);
+          setError("");
+        })
         .catch((e) => setError(e.message)),
     [request],
   );
@@ -1479,21 +1725,27 @@ function DiagnosisPage({ write }) {
     </>
   );
 }
-function CompanyPage({ manage }) {
+function CompanyPage({ manage, write, embedded = false }) {
   const { organization, refresh } = useAuth();
   const request = useOrgApi(),
     [notice, setNotice] = useState(""),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [pending, setPending] = useState(false);
   return (
     <>
-      <Header
-        title="Company settings"
-        description="Keep the company context behind your acquisition process accurate."
-      />
+      {!embedded && (
+        <Header
+          title="Company settings"
+          description="Keep the company context behind your acquisition process accurate."
+        />
+      )}
       <form
         className="panel settingsForm"
         onSubmit={async (e) => {
           e.preventDefault();
+          setPending(true);
+          setError("");
+          setNotice("");
           try {
             const f = new FormData(e.currentTarget);
             await request("/organization", {
@@ -1507,6 +1759,8 @@ function CompanyPage({ manage }) {
             setNotice("Company details saved.");
           } catch (e) {
             setError(e.message);
+          } finally {
+            setPending(false);
           }
         }}
       >
@@ -1544,21 +1798,32 @@ function CompanyPage({ manage }) {
             disabled={!manage}
           />
         </label>
-        {manage && <button className="btn primary">Save company</button>}
+        {manage && (
+          <button className="btn primary" disabled={pending}>
+            {pending ? "Saving…" : "Save company"}
+          </button>
+        )}
       </form>
-      <DocumentPanel manage={manage} />
+      <DocumentPanel manage={write} />
     </>
   );
 }
 function TeamPage({ manage }) {
+  const { organization } = useAuth();
+  const memberManagement = assignableRoles(organization?.role).length > 0;
+  const roles = assignableRoles(organization?.role);
   const request = useOrgApi(),
     [data, setData] = useState(null),
     [error, setError] = useState(""),
-    [invite, setInvite] = useState("");
+    [invite, setInvite] = useState(""),
+    [pending, setPending] = useState(false);
   const load = useCallback(
     () =>
       request("/team")
-        .then(setData)
+        .then((result) => {
+          setData(result);
+          setError("");
+        })
         .catch((e) => setError(e.message)),
     [request],
   );
@@ -1576,13 +1841,17 @@ function TeamPage({ manage }) {
           {data?.members.map((m) => (
             <div className="liveMetric" key={m.user_id}>
               <span>{m.profiles?.full_name || m.user_id}</span>
-              {manage && m.role !== "owner" ? (
+              {memberManagement &&
+              canManageMember(organization?.role, m.role) ? (
                 <select
                   aria-label={
                     "Role for " + (m.profiles?.full_name || m.user_id)
                   }
                   value={m.role}
+                  disabled={pending}
                   onChange={async (e) => {
+                    setPending(true);
+                    setError("");
                     try {
                       await request("/team/" + m.user_id, {
                         method: "PATCH",
@@ -1591,10 +1860,12 @@ function TeamPage({ manage }) {
                       load();
                     } catch (e) {
                       setError(e.message);
+                    } finally {
+                      setPending(false);
                     }
                   }}
                 >
-                  {["admin", "manager", "member", "viewer"].map((r) => (
+                  {roles.map((r) => (
                     <option key={r} value={r}>
                       {titleCase(r)}
                     </option>
@@ -1607,12 +1878,15 @@ function TeamPage({ manage }) {
           ))}
         </section>
       </State>
-      {manage && (
+      {memberManagement && (
         <form
           className="panel livePanel"
           onSubmit={async (e) => {
             e.preventDefault();
             const f = new FormData(e.currentTarget);
+            setPending(true);
+            setError("");
+            setInvite("");
             try {
               const result = await request("/invitations", {
                 method: "POST",
@@ -1622,6 +1896,8 @@ function TeamPage({ manage }) {
               load();
             } catch (e) {
               setError(e.message);
+            } finally {
+              setPending(false);
             }
           }}
         >
@@ -1633,14 +1909,19 @@ function TeamPage({ manage }) {
           <label className="field">
             <span>Role</span>
             <select name="role">
-              {["member", "viewer", "manager", "admin"].map((r) => (
-                <option key={r} value={r}>
-                  {titleCase(r)}
-                </option>
-              ))}
+              {roles
+                .slice()
+                .reverse()
+                .map((r) => (
+                  <option key={r} value={r}>
+                    {titleCase(r)}
+                  </option>
+                ))}
             </select>
           </label>
-          <button className="btn primary">Create invitation link</button>
+          <button className="btn primary" disabled={pending}>
+            {pending ? "Saving…" : "Create invitation link"}
+          </button>
           {invite && (
             <div className="liveNotice" role="status">
               <p>
@@ -1661,11 +1942,18 @@ function PlatformPage() {
   const [rows, setRows] = useState(null),
     [error, setError] = useState(""),
     [selected, setSelected] = useState(null),
-    [reason, setReason] = useState("");
+    [reason, setReason] = useState(""),
+    [pending, setPending] = useState(false);
+  useDialogFocus(!!selected, () => {
+    if (!pending) setSelected(null);
+  });
   const load = useCallback(
     () =>
       api("/platform/organizations")
-        .then((r) => setRows(r.organizations))
+        .then((r) => {
+          setRows(r.organizations);
+          setError("");
+        })
         .catch((e) => setError(e.message)),
     [],
   );
@@ -1733,7 +2021,11 @@ function PlatformPage() {
           >
             <header>
               <h2>Support {selected.name}</h2>
-              <button aria-label="Close" onClick={() => setSelected(null)}>
+              <button
+                aria-label="Close"
+                disabled={pending}
+                onClick={() => setSelected(null)}
+              >
                 <X />
               </button>
             </header>
@@ -1744,6 +2036,8 @@ function PlatformPage() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                setPending(true);
+                setError("");
                 try {
                   await api("/platform/support", {
                     method: "POST",
@@ -1755,6 +2049,8 @@ function PlatformPage() {
                 } catch (e) {
                   setError(e.message);
                   setSelected(null);
+                } finally {
+                  setPending(false);
                 }
               }}
             >
@@ -1768,7 +2064,9 @@ function PlatformPage() {
                   onChange={(e) => setReason(e.target.value)}
                 />
               </label>
-              <button className="btn primary">Start support session</button>
+              <button className="btn primary" disabled={pending}>
+                {pending ? "Starting…" : "Start support session"}
+              </button>
             </form>
           </section>
         </div>
@@ -1782,10 +2080,16 @@ function ConnectionsPage({ section, manage }) {
     [error, setError] = useState("");
   const load = useCallback(
     () =>
-      request(
-        section === "billing" ? "/resources/billing_accounts" : "/integrations",
-      )
-        .then(setData)
+      Promise.all([
+        request("/integrations"),
+        section === "billing"
+          ? request("/resources/billing_accounts")
+          : Promise.resolve(null),
+      ])
+        .then(([providers, accounts]) => {
+          setData({ ...providers, accounts: accounts?.data });
+          setError("");
+        })
         .catch((e) => setError(e.message)),
     [request, section],
   );
@@ -1806,29 +2110,43 @@ function ConnectionsPage({ section, manage }) {
         <section className="panel livePanel">
           {section === "billing" ? (
             <>
-              <h2>{titleCase(data?.data[0]?.plan || "Starter")}</h2>
+              <h2>{titleCase(data?.accounts?.[0]?.plan || "Starter")}</h2>
               <p>
-                Status: {titleCase(data?.data[0]?.status || "Not configured")}
+                Status:{" "}
+                {titleCase(data?.accounts?.[0]?.status || "Not configured")}
               </p>
-              <p>Billing changes require a configured payment provider.</p>
-              {manage && (
-                <button
-                  className="btn primary"
-                  onClick={async () => {
-                    try {
-                      const r = await request("/billing/checkout", {
-                        method: "POST",
-                        body: { plan: "growth" },
-                      });
-                      window.location.assign(r.url);
-                    } catch (e) {
-                      setError(e.message);
-                    }
-                  }}
-                >
-                  Upgrade to Growth
-                </button>
-              )}
+              <p>
+                {data?.providers.find((p) => p.provider === "stripe")
+                  ?.configured
+                  ? "Manage your subscription securely with Stripe."
+                  : "Online billing is not connected yet. Your workspace records are available; no payment will be taken here."}
+              </p>
+              {manage &&
+                data?.providers.find((p) => p.provider === "stripe")
+                  ?.configured && (
+                  <button
+                    className="btn primary"
+                    onClick={async () => {
+                      try {
+                        const existing = !!data?.accounts?.[0]?.customer_id;
+                        const r = await request(
+                          existing ? "/billing/portal" : "/billing/checkout",
+                          {
+                            method: "POST",
+                            body: existing ? {} : { plan: "growth" },
+                          },
+                        );
+                        window.location.assign(r.url);
+                      } catch (e) {
+                        setError(e.message);
+                      }
+                    }}
+                  >
+                    {data?.accounts?.[0]?.customer_id
+                      ? "Manage subscription"
+                      : "Upgrade to Growth"}
+                  </button>
+                )}
             </>
           ) : (
             data?.providers.map((p) => (
@@ -1837,8 +2155,12 @@ function ConnectionsPage({ section, manage }) {
                   <b>{p.name}</b>
                   <small>
                     {p.configured
-                      ? "Server credentials configured"
-                      : "Provider setup required"}
+                      ? "Connected and available to your workspace"
+                      : p.provider === "apollo"
+                        ? "Connect Apollo to search for new companies. Manual records and CSV import work now."
+                        : p.provider === "resend"
+                          ? "Campaign delivery needs a verified sender. This is separate from account verification emails."
+                          : "Connect Stripe to activate online subscriptions."}
                   </small>
                 </span>
                 <strong>{p.configured ? "Available" : "Not connected"}</strong>
@@ -1858,7 +2180,10 @@ function InboxView() {
   const load = useCallback(
     () =>
       request("/resources/messages")
-        .then((r) => setRows(r.data))
+        .then((r) => {
+          setRows(r.data);
+          setError("");
+        })
         .catch((e) => setError(e.message)),
     [request],
   );
@@ -2051,10 +2376,14 @@ function DocumentPanel({ manage }) {
           <button
             className="btn secondary"
             onClick={async () => {
+              const popup = window.open("about:blank", "_blank");
+              if (popup) popup.opener = null;
               try {
                 const r = await request("/documents/" + d.id);
-                window.open(r.url, "_blank", "noopener,noreferrer");
+                if (popup) popup.location.replace(r.url);
+                else window.location.assign(r.url);
               } catch (e) {
+                popup?.close();
                 setMessage(e.message);
               }
             }}
@@ -2074,7 +2403,10 @@ function AuditView() {
   const load = useCallback(
     () =>
       request("/resources/audit_events?limit=100")
-        .then((r) => setRows(r.data))
+        .then((r) => {
+          setRows(r.data);
+          setError("");
+        })
         .catch((e) => setError(e.message)),
     [request],
   );
