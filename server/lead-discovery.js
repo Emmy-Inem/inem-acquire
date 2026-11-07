@@ -1,5 +1,6 @@
 import { industries } from "../shared/research.js";
 import { askGemini } from "./gemini.js";
+import { findWikidataBusinesses } from "./wikidata-directory.js";
 
 export function webUrl(value) {
   try {
@@ -44,6 +45,32 @@ export async function findBusinesses(env, { city, country, industry }) {
 }
 
 async function search(env, city, country, industry) {
+  const directory = await findWikidataBusinesses(
+    { city, country, industry },
+    webUrl,
+  ).catch(() => null);
+  let companies = directory || [];
+  if (!companies.length) {
+    const mapped = await findMappedBusinesses(
+      env,
+      city,
+      country,
+      industry,
+    ).catch(() => null);
+    if (!mapped && !directory) {
+      throw Object.assign(
+        new Error(
+          "The public directories are busy. Try again shortly or check a company website below.",
+        ),
+        { status: 503 },
+      );
+    }
+    companies = mapped || companies;
+  }
+  return prioritize(env, industries[industry].label, companies);
+}
+
+async function findMappedBusinesses(env, city, country, industry) {
   const { label, tags } = industries[industry];
   const cityPattern = "^" + city.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$";
   const clauses = Object.entries(tags)
@@ -106,6 +133,7 @@ async function search(env, city, country, industry) {
       industry: category?.replaceAll("_", " ") || label,
       country,
       source_url,
+      directory: "OpenStreetMap",
       email:
         (fields["contact:email"] || fields.email || "")
           .split(";")
@@ -117,6 +145,10 @@ async function search(env, city, country, industry) {
         ) || null,
     });
   }
+  return companies;
+}
+
+async function prioritize(env, label, companies) {
   const categories = [...new Set(companies.map((row) => row.industry))];
   const ranked =
     categories.length > 1 &&

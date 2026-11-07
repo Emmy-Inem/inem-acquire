@@ -28,6 +28,8 @@ test("website scans reject loopback, link-local, and IPv4-mapped loopback", asyn
 
 test("directory results preserve attribution, omit private inboxes, and reuse a cached search", async (t) => {
   const fetch = t.mock.method(globalThis, "fetch", async (url) => {
+    if (url.hostname === "query.wikidata.org")
+      return Response.json({ results: { bindings: [] } });
     assert.match(
       url.searchParams.get("data"),
       /"ISO3166-1"="NG".*"name"~"\^Lagos\$",i/,
@@ -67,7 +69,7 @@ test("directory results preserve attribution, omit private inboxes, and reuse a 
   assert.equal(result.companies[1].email, null);
   assert.equal(result.companies[1].website, null);
   assert.deepEqual(await findBusinesses({}, query), result);
-  assert.equal(fetch.mock.callCount(), 1);
+  assert.equal(fetch.mock.callCount(), 2);
 });
 
 test("Gemini receives standard topics only and failure leaves the evidence flow usable", async (t) => {

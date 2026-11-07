@@ -141,6 +141,14 @@ export default function ProspectResearch({ onSaved }) {
         >
           © OpenStreetMap contributors · ODbL
         </a>
+        {" · "}
+        <a
+          href="https://www.wikidata.org/wiki/Wikidata:Licensing"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Wikidata · CC0
+        </a>
       </p>
       {error && (
         <p className="liveError" role="alert">
@@ -170,7 +178,7 @@ export default function ProspectResearch({ onSaved }) {
                 <p>
                   {row.industry} ·{" "}
                   <a href={key} target="_blank" rel="noreferrer">
-                    Directory listing
+                    {row.directory || "Directory listing"}
                   </a>
                   {row.website && (
                     <>
@@ -215,7 +223,9 @@ export default function ProspectResearch({ onSaved }) {
                         website,
                         source_url,
                         notes: [
-                          "Directory: © OpenStreetMap contributors (ODbL), https://www.openstreetmap.org/copyright",
+                          row.directory === "Wikidata"
+                            ? "Directory: Wikidata (CC0)"
+                            : "Directory: © OpenStreetMap contributors (ODbL), https://www.openstreetmap.org/copyright",
                           ...contacts.map((contact) =>
                             [
                               contact.source,
