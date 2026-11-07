@@ -355,11 +355,14 @@ try {
     .waitFor();
   await listDialog.getByRole("button", { name: "Close", exact: true }).click();
   await page.goto(base + "/app/prospects");
-  await page.getByText("Research new companies", { exact: true }).click();
   await page
-    .getByText("External research needs an Apollo connection.", {
-      exact: false,
-    })
+    .getByText("Find companies and public contacts", { exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Find companies", exact: true })
+    .waitFor();
+  await page
+    .getByLabel("Check any public business website", { exact: true })
     .waitFor();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForFunction(

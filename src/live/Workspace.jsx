@@ -389,6 +389,10 @@ export function LiveWorkspace() {
               <BriefcaseBusiness />
               Billing
             </NavLink>
+            <NavLink to="/app/guide">
+              <Lightbulb />
+              Workspace guide
+            </NavLink>
             {session.platformOwner && (
               <NavLink to="/app/admin">
                 <ShieldCheck />
@@ -400,10 +404,6 @@ export function LiveWorkspace() {
         <div className="sideBottom">
           <NavLink to="/app/settings">
             <Settings /> Settings
-          </NavLink>
-          <NavLink to="/app/guide">
-            <Lightbulb />
-            Workspace guide
           </NavLink>
           <div className="userChip">
             <span className="avatar">{initials}</span>
@@ -1706,6 +1706,17 @@ function DiagnosisPage({ write }) {
                 </article>
               ))}
             </section>
+            {!!latest.evidence?.gemini_steps?.length && (
+              <article className="panel livePanel">
+                <h2>Suggested next steps</h2>
+                <p>Gemini suggestions based on the types of findings above.</p>
+                <ol>
+                  {latest.evidence.gemini_steps.map((step, index) => (
+                    <li key={index}>{step}</li>
+                  ))}
+                </ol>
+              </article>
+            )}
             <article className="panel livePanel">
               <h2>Evidence used</h2>
               <p>{latest.evidence.scope}</p>
@@ -2154,16 +2165,26 @@ function ConnectionsPage({ section, manage }) {
                 <span>
                   <b>{p.name}</b>
                   <small>
-                    {p.configured
-                      ? "Connected and available to your workspace"
-                      : p.provider === "apollo"
-                        ? "Connect Apollo to search for new companies. Manual records and CSV import work now."
-                        : p.provider === "resend"
-                          ? "Campaign delivery needs a verified sender. This is separate from account verification emails."
-                          : "Connect Stripe to activate online subscriptions."}
+                    {p.provider === "gemini"
+                      ? p.configured
+                        ? "Key configured for prospect ranking and sales suggestions. Requests use public categories and general playbook topics."
+                        : "Add a Gemini API key to enable prospect ranking and sales suggestions."
+                      : p.configured
+                        ? "Connected and available to your workspace"
+                        : p.provider === "apollo"
+                          ? "Connect Apollo to search for new companies. Manual records and CSV import work now."
+                          : p.provider === "resend"
+                            ? "Campaign delivery needs a verified sender. This is separate from account verification emails."
+                            : "Connect Stripe to activate online subscriptions."}
                   </small>
                 </span>
-                <strong>{p.configured ? "Available" : "Not connected"}</strong>
+                <strong>
+                  {p.configured
+                    ? p.provider === "gemini"
+                      ? "Key configured"
+                      : "Available"
+                    : "Not connected"}
+                </strong>
               </div>
             ))
           )}
@@ -2287,10 +2308,17 @@ function AdvisorPage() {
         <article className="panel livePanel">
           <h2>Your next priorities</h2>
           <p className="liveMessageBody">{answer.answer}</p>
-          <small>
-            Method: {answer.mode}. This is a rules-based review, not a generated
-            prediction.
-          </small>
+          <small>Evidence review · {answer.mode}</small>
+          {!!answer.gemini_steps?.length && (
+            <>
+              <h3>Gemini suggestions</h3>
+              <ol>
+                {answer.gemini_steps.map((step, index) => (
+                  <li key={index}>{step}</li>
+                ))}
+              </ol>
+            </>
+          )}
           <div className="liveEvidence">
             {answer.sources.map((s, i) => (
               <Link

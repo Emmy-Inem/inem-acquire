@@ -1,3 +1,4 @@
+import { suggestedNextSteps } from "./gemini.js";
 import { webhookRoutes, extensionRoutes } from "./extensions.js";
 import "dotenv/config";
 import dotenv from "dotenv";
@@ -128,13 +129,11 @@ export function createApp({
       standardHeaders: true,
       legacyHeaders: false,
       handler: (_req, res) =>
-        res
-          .status(429)
-          .json({
-            error:
-              "Too many sign-in attempts. Please wait a few minutes and try again.",
-            code: "auth_rate_limited",
-          }),
+        res.status(429).json({
+          error:
+            "Too many sign-in attempts. Please wait a few minutes and try again.",
+          code: "auth_rate_limited",
+        }),
     }),
   );
   webhookRoutes(app, { env, admin, result, wrap });
@@ -610,14 +609,28 @@ export function createApp({
     "/api/diagnosis",
     auth,
     organization("write"),
-    wrap(async (req, res) =>
-      res.json(
-        await edge(req, "sales-intelligence", {
-          organization_id: req.org,
-          action: "diagnose",
-        }),
-      ),
-    ),
+    wrap(async (req, res) => {
+      const diagnosis = await edge(req, "sales-intelligence", {
+        organization_id: req.org,
+        action: "diagnose",
+      });
+      const steps = await suggestedNextSteps(
+        env,
+        diagnosis.data?.findings || [],
+      );
+      if (steps.length) {
+        const evidence = { ...diagnosis.data.evidence, gemini_steps: steps };
+        const saved = await admin()
+          .from("diagnoses")
+          .update({ evidence })
+          .eq("organization_id", req.org)
+          .eq("id", diagnosis.data.id)
+          .select("*")
+          .single();
+        if (!saved.error && saved.data) diagnosis.data = saved.data;
+      }
+      res.json(diagnosis);
+    }),
   );
   app.post(
     "/api/advisor",
@@ -627,13 +640,24 @@ export function createApp({
       const { question } = z
         .object({ question: z.string().min(3).max(2000) })
         .parse(req.body);
-      res.json(
-        await edge(req, "sales-intelligence", {
-          organization_id: req.org,
-          action: "advisor",
-          question,
-        }),
+      const advice = await edge(req, "sales-intelligence", {
+        organization_id: req.org,
+        action: "advisor",
+        question,
+      });
+      const topic = [
+        ["tasks", /follow.up|task|overdue/i],
+        ["deals", /deal|pipeline/i],
+        ["icps", /ideal|target|segment/i],
+        ["contacts", /email|outreach|consent/i],
+        ["offers", /offer|pricing/i],
+      ].find(([, pattern]) => pattern.test(question))?.[0];
+      const steps = await suggestedNextSteps(
+        env,
+        (advice.sources || []).map((source) => ({ source: source.table })),
+        topic,
       );
+      res.json({ ...advice, gemini_steps: steps });
     }),
   );
   app.post(
@@ -827,6 +851,11 @@ export function createApp({
   app.get("/api/integrations", auth, organization("read"), (_req, res) =>
     res.json({
       providers: [
+        {
+          name: "Gemini assistance",
+          provider: "gemini",
+          configured: !!env.GEMINI_API_KEY,
+        },
         {
           name: "Email delivery",
           provider: "resend",

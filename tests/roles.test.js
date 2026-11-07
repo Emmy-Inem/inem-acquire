@@ -123,7 +123,7 @@ test("all organization readers can inspect integration availability without rece
     const response = await request(app).get("/api/integrations")
       .set("Cookie", "ac-access=test-token").set("x-organization-id", org);
     assert.equal(response.status, 200, role);
-    assert.equal(response.body.providers[0].configured, true);
+    assert.equal(response.body.providers.find(provider => provider.provider === "resend").configured, true);
     assert.equal(JSON.stringify(response.body).includes("private-test-secret"), false);
     assert.ok(response.body.providers.every(provider => Object.keys(provider).every(key => ["name", "provider", "configured"].includes(key))));
   }

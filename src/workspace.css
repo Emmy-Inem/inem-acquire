@@ -105,15 +105,31 @@
   font-weight: 650;
 }
 .appShell .sideBottom {
-  padding-top: 12px;
+  flex-shrink: 0;
+  padding-top: 6px;
 }
 .appShell .sideBottom > a {
   display: flex;
   align-items: center;
+  min-height: 40px;
+  padding-block: 8px;
 }
 .appShell .userChip {
-  padding: 14px 4px 0;
-  gap: 10px;
+  min-height: 44px;
+  padding: 2px 4px 0;
+  gap: 8px;
+}
+.appShell .userChip .avatar {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+}
+.appShell .userChip button {
+  min-width: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
 }
 .appShell .userChip b {
   font-size: 12px;
@@ -121,7 +137,8 @@
 }
 .appShell .userChip small {
   font-size: 11px;
-  margin-top: 4px;
+  margin-top: 2px;
+  line-height: 1.3;
 }
 .appShell .avatar {
   width: 34px;
@@ -560,6 +577,41 @@
 .researchPanel > p a {
   color: #0757f6;
   text-decoration: underline;
+}
+.researchForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.researchForm .field {
+  flex: 1 1 150px;
+  margin: 0;
+}
+.researchWebsite {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #dfe6ef;
+}
+.researchPanel .researchAttribution {
+  margin: 12px 0;
+  font-size: 12px;
+}
+.researchContacts {
+  margin: 8px 0;
+  padding-inline-start: 18px;
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.researchPanel a {
+  color: #0757f6;
+  text-decoration: underline;
+}
+.researchActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 @media (max-width: 1100px) {
   .appShell .appTop {

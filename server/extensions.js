@@ -3,6 +3,10 @@ import Stripe from "stripe";
 import { Webhook } from "svix";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
+import rateLimit from "express-rate-limit";
+import { industries } from "../shared/research.js";
+import { findBusinesses } from "./lead-discovery.js";
+import { scanBusinessWebsite } from "./business-website.js";
 export function webhookRoutes(app, { env, admin, result, wrap }) {
   app.post(
     "/api/webhooks/stripe",
@@ -294,6 +298,56 @@ export function extensionRoutes(
         return_url: origin + "/app/billing",
       });
       res.json({ url: session.url });
+    }),
+  );
+  const researchLimit = rateLimit({
+    windowMs: 60_000,
+    limit: 5,
+    keyGenerator: (req) => req.user.id,
+    handler: (_req, res) =>
+      res
+        .status(429)
+        .json({
+          error: "Please wait a minute before making another research request.",
+        }),
+  });
+  app.post(
+    "/api/prospects/public-directory",
+    auth,
+    organization("write"),
+    researchLimit,
+    wrap(async (req, res) => {
+      const query = z
+        .object({
+          city: z
+            .string()
+            .trim()
+            .min(2)
+            .max(75)
+            .regex(/^[\p{L}\p{M}\d .,'’()-]+$/u),
+          country: z
+            .string()
+            .trim()
+            .toUpperCase()
+            .regex(/^[A-Z]{2}$/),
+          industry: z.enum(Object.keys(industries)),
+        })
+        .strict()
+        .parse(req.body);
+      res.json(await findBusinesses(env, query));
+    }),
+  );
+  app.post(
+    "/api/prospects/check-website",
+    auth,
+    organization("write"),
+    researchLimit,
+    wrap(async (req, res) => {
+      const { website } = z
+        .object({ website: z.string().trim().max(500).url() })
+        .strict()
+        .parse(req.body);
+      res.json({ contacts: await scanBusinessWebsite(website) });
     }),
   );
   app.post(
