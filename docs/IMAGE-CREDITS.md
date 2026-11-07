@@ -8,7 +8,7 @@
 - License: https://www.pexels.com/license/
 - Local files: public/videos/hero-team-collaboration.mp4 and public/images/hero-collaboration-poster.jpg
 - Treatment: 28 seconds of source footage converted to a 27-second silent H.264 loop, using a one-second tail/head crossfade. Cropped to remove excess headroom and bring faces higher into the hero. Responsive framing and dark CSS overlays; poster is the first output frame. No generative imagery or artificial blur.
-- Muted looping playback includes a pause control, pauses offscreen, and uses the poster instead when reduced motion is requested.
+- Muted looping playback pauses offscreen and uses the poster instead when reduced motion is requested.
 - Illustrative stock footage; no endorsement by the depicted people is implied.
 
 ## Previous hero photo (retained asset)
