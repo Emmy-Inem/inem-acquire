@@ -272,10 +272,12 @@ export default function ProspectResearch({ onSaved }) {
     if (phase || !scrollAfterPage.current) return;
     scrollAfterPage.current = false;
     if (error) return;
-    resultTop.current?.scrollIntoView({
+    resultTop.current?.focus({ preventScroll: true });
+    const frame = requestAnimationFrame(() => window.scrollTo({
+      top: 0,
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-      block: "start",
-    });
+    }));
+    return () => cancelAnimationFrame(frame);
   }, [phase, error, catalogPage?.query.page]);
 
   const complete = rows.filter((row) => checked[rowKey(row)]).length;
@@ -388,7 +390,7 @@ export default function ProspectResearch({ onSaved }) {
           {error}
         </p>
       )}
-      <div ref={resultTop} className="leadResultToolbar leadResultsStart">
+      <div ref={resultTop} tabIndex={-1} className="leadResultToolbar leadResultsStart">
         <p role="status">
           {catalogPage
             ? rows.length
