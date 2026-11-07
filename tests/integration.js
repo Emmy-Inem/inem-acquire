@@ -327,6 +327,37 @@ try {
   const ownerDirectory = await b.agent.get("/api/platform/organizations");
   assert.equal(ownerDirectory.status, 200);
   assert.ok(ownerDirectory.body.organizations.some((org) => org.id === a.org));
+  const nameQuery = encodeURIComponent("QA organization " + a.id.slice(0, 6));
+  const found = await b.agent.get("/api/platform/organizations?search=" + nameQuery);
+  assert.equal(found.status, 200, found.body.error);
+  assert.deepEqual(found.body.organizations.map((org) => org.id), [a.org]);
+  assert.equal(found.body.organizations[0].operation_status, "routine");
+  assert.ok(found.body.organizations[0].member_count >= 1);
+  const detailPath = "/api/platform/organizations/" + a.org;
+  const detail = await b.agent.get(detailPath);
+  assert.equal(detail.status, 200, detail.body.error);
+  assert.equal(detail.body.operations, null);
+  assert.equal((await a.agent.get(detailPath)).status, 403);
+  const update = { status: "attention", note: "QA private follow-up", updatedAt: null };
+  assert.equal((await a.agent.patch(detailPath + "/operations").set("Origin", origin).send(update)).status, 403);
+  const directUpdate = await a.db.rpc("set_platform_organization_operations", {
+    target_org: a.org, next_status: "attention", next_note: "Rejected", expected_updated_at: null,
+  });
+  assert.equal(directUpdate.error?.code, "42501");
+  const directRead = await a.db.from("platform_organization_operations").select("internal_note").eq("organization_id", a.org);
+  assert.equal(directRead.error?.code, "42501");
+  const updated = await b.agent.patch(detailPath + "/operations").set("Origin", origin).send(update);
+  assert.equal(updated.status, 200, updated.body.error);
+  const saved = await b.agent.get(detailPath);
+  assert.equal(saved.body.operations.internal_note, update.note);
+  assert.equal(saved.body.events[0].status, "attention");
+  const filtered = await b.agent.get("/api/platform/organizations?status=attention&search=" + nameQuery);
+  assert.deepEqual(filtered.body.organizations.map((org) => org.id), [a.org]);
+  const stale = await b.agent.patch(detailPath + "/operations").set("Origin", origin).send({ ...update, note: "Stale edit" });
+  assert.equal(stale.status, 409, stale.body.error);
+  const latest = await b.agent.patch(detailPath + "/operations").set("Origin", origin).send({ status: "monitoring", note: update.note, updatedAt: saved.body.operations.updated_at });
+  assert.equal(latest.status, 200, latest.body.error);
+  check("platform directory and audited private follow-ups respect role and revision boundaries");
   const ownSupport = await post(b, "/platform/support", b.org, {
     organization_id: b.org,
     reason: "A membership must keep its existing permissions",

@@ -368,6 +368,12 @@ export function LiveWorkspace() {
         </Link>
         </>
         )}
+        {session.platformOwner && (
+          <Link className="createWorkspaceLink platformShortcut" to="/platform">
+            <ShieldCheck size={16} />
+            Platform console
+          </Link>
+        )}
         <nav>
           {navigation.map(([group, items]) => (
             <div className="navGroup" key={group}>
@@ -410,12 +416,6 @@ export function LiveWorkspace() {
               <Lightbulb />
               Workspace guide
             </NavLink>
-            {session.platformOwner && (
-              <NavLink to="/platform">
-                <ShieldCheck />
-                Platform console
-              </NavLink>
-            )}
           </div>
         </nav>
         <div className="sideBottom">
@@ -2003,180 +2003,6 @@ function TeamPage({ manage }) {
     </>
   );
 }
-export function PlatformConsole() {
-  const { session, organization, logout } = useAuth();
-  const navigate = useNavigate();
-  const [error, setError] = useState("");
-
-  if (!session.platformOwner)
-    return (
-      <main className="liveState">
-        <ShieldCheck />
-        <h1>Platform owner access required</h1>
-        <p>Platform administration is reserved for platform owners.</p>
-        <Link className="btn secondary" to={organization ? "/app/dashboard" : "/onboarding/welcome"}>Return to your workspace</Link>
-      </main>
-    );
-
-  return (
-    <div className="platformConsole">
-      <header className="platformConsoleBar">
-        <LiveBrand />
-        <div className="platformConsoleActions">
-          {organization && <Link className="btn secondary" to="/app/dashboard">My workspace</Link>}
-          <button className="btn secondary" onClick={() => logout().then(() => navigate("/login")).catch((e) => setError(e.message))}>
-            <LogOut size={17} /> Sign out
-          </button>
-        </div>
-      </header>
-      <main className="appMain platformConsoleMain">
-        {error && <p className="liveError" role="alert">{error}</p>}
-        <PlatformPage />
-      </main>
-    </div>
-  );
-}
-
-function PlatformPage() {
-  const { session, refresh, organizations, selectOrganization } = useAuth(),
-    navigate = useNavigate();
-  const [rows, setRows] = useState(null),
-    [error, setError] = useState(""),
-    [selected, setSelected] = useState(null),
-    [reason, setReason] = useState(""),
-    [pending, setPending] = useState(false);
-  useDialogFocus(!!selected, () => {
-    if (!pending) setSelected(null);
-  });
-  const load = useCallback(
-    () =>
-      api("/platform/organizations")
-        .then((r) => {
-          setRows(r.organizations);
-          setError("");
-        })
-        .catch((e) => setError(e.message)),
-    [],
-  );
-  useEffect(() => {
-    load();
-  }, [load]);
-  return (
-    <>
-      <Header
-        title="Platform console"
-        description="Manage the platform and help organizations through time-limited, audited support sessions."
-      />
-      <State
-        loading={!rows && !error}
-        error={error}
-        retry={load}
-        empty={
-          !rows?.length
-            ? "Organizations will appear here after their owners create a workspace."
-            : false
-        }
-      >
-        <section className="panel livePanel">
-          {rows?.map((o) => {
-            const member = organizations.find((org) => org.id === o.id);
-            const support = session.supportSessions?.find((item) => item.organization_id === o.id && Date.parse(item.expires_at) > Date.now());
-            return (
-            <div className="liveMetric" key={o.id}>
-              <span>
-                <b>{o.name}</b>
-                <small>{o.industry || "Industry not set"}</small>
-              </span>
-              {member ? (
-                <Link className="btn secondary" to="/app/dashboard" onClick={() => selectOrganization(o.id)}>
-                  Open workspace <ArrowRight size={15} />
-                </Link>
-              ) : support ? (
-                <Link className="btn secondary" to={"/support/" + o.id + "/dashboard"}>
-                  Resume support <ArrowRight size={15} />
-                </Link>
-              ) : (
-              <button
-                className="btn secondary"
-                onClick={() => {
-                  setSelected(o);
-                  setReason("");
-                }}
-              >
-                Start support <ArrowRight size={15} />
-              </button>
-              )}
-            </div>
-            );
-          })}
-        </section>
-      </State>
-      <PlatformRequests />
-      <Link className="btn primary" to="/onboarding/welcome">
-        <Plus size={16} />
-        Create an organization
-      </Link>
-      {selected && (
-        <div className="liveModalBackdrop">
-          <section
-            className="panel liveModal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Start support session"
-          >
-            <header>
-              <h2>Support {selected.name}</h2>
-              <button
-                aria-label="Close"
-                disabled={pending}
-                onClick={() => setSelected(null)}
-              >
-                <X />
-              </button>
-            </header>
-            <p>
-              This opens a separate support workspace for one hour. You can help with everyday records. Organization administration, approvals and billing require membership permissions. Your reason and changes are recorded in the organization’s audit trail.
-            </p>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setPending(true);
-                setError("");
-                try {
-                  await api("/platform/support", {
-                    method: "POST",
-                    body: { organization_id: selected.id, reason },
-                  });
-                  await refresh();
-                  navigate("/support/" + selected.id + "/dashboard");
-                } catch (e) {
-                  setError(e.message);
-                  setSelected(null);
-                } finally {
-                  setPending(false);
-                }
-              }}
-            >
-              <label className="field">
-                <span>Reason for access</span>
-                <textarea
-                  minLength={10}
-                  maxLength={500}
-                  required
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </label>
-              <button className="btn primary" disabled={pending}>
-                {pending ? "Starting…" : "Start support session"}
-              </button>
-            </form>
-          </section>
-        </div>
-      )}
-    </>
-  );
-}
 function ConnectionsPage({ section, manage }) {
   const request = useOrgApi(),
     [data, setData] = useState(null),
@@ -2564,43 +2390,5 @@ function AuditView() {
         </section>
       </State>
     </>
-  );
-}
-
-function PlatformRequests() {
-  const [rows, setRows] = useState(null),
-    [error, setError] = useState("");
-  useEffect(() => {
-    api("/platform/demo-requests")
-      .then((r) => setRows(r.requests))
-      .catch((e) => setError(e.message));
-  }, []);
-  return (
-    <section className="panel livePanel">
-      <h2>Demo requests</h2>
-      {error ? (
-        <p className="liveError" role="alert">
-          {error}
-        </p>
-      ) : !rows ? (
-        <p role="status">Loading requests…</p>
-      ) : !rows.length ? (
-        <p>No demo requests yet.</p>
-      ) : (
-        rows.map((row) => (
-          <article className="liveMetric" key={row.id}>
-            <span>
-              <b>
-                {row.name} · {row.company}
-              </b>
-              <small>
-                {row.email} · {new Date(row.created_at).toLocaleDateString()}
-              </small>
-              <p>{row.message}</p>
-            </span>
-          </article>
-        ))
-      )}
-    </section>
   );
 }

@@ -37,6 +37,8 @@ Platform ownership is a separate role, never a client-controlled profile field. 
 
 The platform console at `/platform` shows a limited organization directory. Actual memberships open in `/app` under their organization role. Supporting another organization requires a reason and opens `/support/:organizationId` for one hour. The session ID must accompany organization requests in `x-support-session-id`. It is bound to the requesting owner and selected organization, and grants read and ordinary write access. Administration, approvals, billing and CSV exports require the corresponding membership capability. Start, end and workspace changes are audited.
 
+The console directory pages all organizations and supports name search and follow-up status filters. The organization detail shows membership counts, billing summaries, support history and private follow-up notes. Platform-only changes are recorded separately and use a revision check to prevent overwriting a concurrent edit.
+
 ## Core API
 
 All browser endpoints start with `/api`. Protected organization endpoints require `x-organization-id`. Pagination uses `limit` (max 100) and `offset`; search uses `search`.

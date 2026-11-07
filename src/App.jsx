@@ -1,6 +1,6 @@
 import { AuthPage, SetupPage, LiveDemoForm } from "./live/AuthPages";
 import { RequireAuth, SupportScope } from "./live/AuthContext";
-import { LiveWorkspace, PlatformConsole } from "./live/Workspace";
+import { LiveWorkspace } from "./live/Workspace";
 import { AnimatedPreview } from "./PlatformMotion";
 import WorkflowPreview from "./WorkflowPreview";
 import HeroVideo from "./HeroVideo";
@@ -118,6 +118,8 @@ const routes = {
     "/onboarding/complete",
   ],
 };
+const PlatformConsole = React.lazy(() => import("./live/PlatformConsole").then((module) => ({ default: module.PlatformConsole })));
+
 function Brand({ compact = false }) {
   return (
     <Link
@@ -1356,7 +1358,16 @@ export default function App() {
           </RequireAuth>
         }
       />
-      <Route path="/platform" element={<RequireAuth><PlatformConsole /></RequireAuth>} />
+      <Route
+        path="/platform/*"
+        element={
+          <RequireAuth>
+            <React.Suspense fallback={<p className="liveState" role="status">Opening the platform console…</p>}>
+              <PlatformConsole />
+            </React.Suspense>
+          </RequireAuth>
+        }
+      />
       <Route
         path="/support/:organizationId/*"
         element={<RequireAuth><SupportScope><LiveWorkspace /></SupportScope></RequireAuth>}

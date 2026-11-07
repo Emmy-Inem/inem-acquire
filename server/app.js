@@ -1,3 +1,4 @@
+import { platformOrganizationRoutes } from "./platform-organizations.js";
 import { suggestedNextSteps } from "./gemini.js";
 import { webhookRoutes, extensionRoutes } from "./extensions.js";
 import "dotenv/config";
@@ -812,20 +813,7 @@ export function createApp({
       return res.status(403).json({ error: "Platform owner access required" });
     next();
   }));
-  app.get(
-    "/api/platform/organizations",
-    wrap(async (req, res) => {
-      res.json({
-        organizations: result(
-          await admin()
-            .from("organizations")
-            .select("id,name,industry,created_at")
-            .order("created_at", { ascending: false })
-            .limit(200),
-        ),
-      });
-    }),
-  );
+  platformOrganizationRoutes(app, { admin, result, wrap });
   app.post(
     "/api/platform/support",
     wrap(async (req, res) => {
