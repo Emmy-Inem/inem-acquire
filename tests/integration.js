@@ -370,7 +370,11 @@ try {
   assert.equal(discovery.status, 200, discovery.body.error);
   assert.equal(discovery.body.companies.length, 20);
   assert.equal(discovery.body.hasMore, true);
-  assert.ok(discovery.body.companies.every((row) => row.directory === "Overture" && (row.phone || row.email)));
+  assert.ok(discovery.body.companies.every((row) =>
+    row.catalog && ["Overture", "Foursquare"].includes(row.directory) &&
+    row.release && (row.phone || row.email)));
+  assert.ok(discovery.body.companies.every((row) =>
+    row.directory !== "Foursquare" || row.id.startsWith("fsq:")));
   const next = await post(a, "/prospects/public-directory", a.org, { ...query, page: 2 });
   assert.equal(next.status, 200, next.body.error);
   assert.ok(next.body.companies.every((row) => !discovery.body.companies.some((first) => row.id === first.id)));

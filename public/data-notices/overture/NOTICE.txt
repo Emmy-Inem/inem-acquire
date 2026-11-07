@@ -9,3 +9,12 @@ education listings. The original place ID and upstream source licenses are retai
 See the accompanying CDLA Permissive 2.0, CC0 1.0 and Apache 2.0 licenses.
 The Foursquare Open Source Places data was transformed to the Overture schema and
 further filtered and normalized by Inem Acquire. See NOTICE-Foursquare.txt.
+
+The catalog also includes the February 6, 2025 Foursquare Open Source Places
+snapshot, mirrored by Fused on Source Cooperative.
+https://source.coop/fused/fsq-os-places
+https://docs.foursquare.com/data-products/docs/fsq-places-open-source
+
+Inem Acquire filters this snapshot to Nigerian business categories, normalizes
+published contact fields and removes overlapping listings. The Apache 2.0
+license and the Foursquare notice accompany this distribution.

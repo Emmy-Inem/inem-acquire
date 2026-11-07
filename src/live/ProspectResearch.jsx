@@ -162,7 +162,7 @@ export default function ProspectResearch({ onSaved }) {
             : ""
           : "No companies matched. Try a nearby city or another industry.",
       );
-      await enrich(result.companies.filter((row) => row.directory !== "Overture"), job, defaultCountry);
+      await enrich(result.companies.filter((row) => !row.catalog), job, defaultCountry);
     } catch (error) {
       if (!job.signal.aborted) setError(error.message);
     } finally {
@@ -180,7 +180,7 @@ export default function ProspectResearch({ onSaved }) {
         ...result,
         companies: result.companies.map((row) => ({
           ...row,
-          city: row.city || (row.directory !== "Overture" ? query.city : null),
+          city: row.city || (!row.catalog ? query.city : null),
         })),
       };
     }, query.country, query);
@@ -407,8 +407,11 @@ export default function ProspectResearch({ onSaved }) {
                           <details className="leadEvidenceLinks">
                             <summary>Sources</summary>
                             <a href={row.source_url} target="_blank" rel="noreferrer">
-                              {row.directory === "Overture" ? "Overture Maps Explorer" : "Company listing"}
+                              {row.catalog ? row.directory + " · " + row.release : "Company listing"}
                             </a>
+                            {row.emailEvidence && <a href={row.emailEvidence} target="_blank" rel="noreferrer">Published email source</a>}
+                            {row.phoneEvidence && <a href={row.phoneEvidence} target="_blank" rel="noreferrer">Published phone source</a>}
+                            {row.contactCheckedAt && <small>Website checked {new Date(row.contactCheckedAt).toLocaleDateString()}</small>}
                             {info.pages
                               .filter((page) => page.source !== row.source_url)
                               .map((page, index) => (
@@ -506,8 +509,10 @@ export default function ProspectResearch({ onSaved }) {
                                   const notes = [
                                     row.directory === "OpenStreetMap" &&
                                       "© OpenStreetMap contributors · ODbL · https://www.openstreetmap.org/copyright",
-                                    row.directory === "Overture" &&
-                                      ["Overture Maps Foundation", row.release, row.id, "https://docs.overturemaps.org/attribution/#places"].join(" · "),
+                                    row.catalog &&
+                                      [row.directory, row.release, row.id, row.source_url].join(" · "),
+                                    row.emailEvidence && "Published email source: " + row.emailEvidence,
+                                    row.phoneEvidence && "Published phone source: " + row.phoneEvidence,
                                     row.needsReview && "Business category needs review",
                                     info.address && "Address: " + info.address,
                                     info.employees &&
@@ -573,9 +578,9 @@ export default function ProspectResearch({ onSaved }) {
               <button className="btn secondary" disabled={!!phase || !catalogPage.hasMore} onClick={() => searchDirectory({ ...catalogPage.query, page: catalogPage.query.page + 1 })}>Next</button>
             </nav>
           )}
-          {shown.some((row) => row.directory === "Overture") && (
+          {shown.some((row) => row.catalog) && (
             <p className="leadCredit">
-              Listings from Overture Maps Foundation. Contact details may change.{" "}
+              Catalog sources include Overture Maps Foundation and Foursquare Open Source Places.{" "}
               <a href="/data-notices/overture/NOTICE.txt" target="_blank" rel="noreferrer">Source and license notices</a>
             </p>
           )}

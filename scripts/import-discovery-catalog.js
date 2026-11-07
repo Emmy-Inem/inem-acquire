@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { parse } from "csv-parse";
 import { createReadStream } from "node:fs";
 import { webUrl } from "../server/lead-discovery.js";
+import { catalogIndustries } from "../server/discovery-industries.js";
 
 dotenv.config({ path: ".env.local", quiet: true });
 const paths = process.argv.slice(2);
@@ -15,17 +16,6 @@ const db = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } },
 );
 
-const categories = {
-  technology: /software|technology|computer|telecom|electronics|internet|technical/,
-  logistics: /logistics|transport|shipping|cargo|courier|freight|moving|delivery/,
-  professional: /professional|consult|account|legal|lawyer|advertis|marketing|architect|employment|translation/,
-  property: /estate|construction|property|architect|contractor|building/,
-  healthcare: /health_care|hospital$|medical|dental|dentist|pharmacy|clinic|optician/,
-  hospitality: /lodging|food_and_drink|hotel|restaurant|cafe|guest_house|catering/,
-  retail: /shopping|retail|store|supermarket|boutique/,
-  finance: /financ|bank|insurance|invest|credit|mortgage/,
-};
-
 function text(value) {
   return value?.replace(/^'(?=\s*[-=+@]|[\t\r\n])/, "").trim() || null;
 }
@@ -33,15 +23,12 @@ function text(value) {
 function listing(row, needsReview) {
   const category = text(row.category),
     categoryGroup = text(row.category_group);
-  const tags = [category, categoryGroup].filter(Boolean).join(" ");
   const item = {
     overture_place_id: text(row.overture_place_id),
     name: text(row.business_name),
     category,
     category_group: categoryGroup,
-    industries: Object.entries(categories)
-      .filter(([, pattern]) => pattern.test(tags))
-      .map(([industry]) => industry),
+    industries: catalogIndustries(category, categoryGroup),
     phone: text(row.phone_e164),
     email: text(row.email),
     website: webUrl(row.website),

@@ -6,7 +6,7 @@ export async function searchCatalog(db, { city, country, industry, keyword, page
   const offset = (page - 1) * pageSize;
   let search = db
     .from("discovery_catalog")
-    .select("overture_place_id,name,category,phone,email,website,city,region,address,country,needs_review,source_release")
+    .select("overture_place_id,name,category,phone,email,website,city,region,address,country,needs_review,source_release,listing_source,email_evidence_url,phone_evidence_url,contact_checked_at")
     .eq("country", country)
     .order("needs_review")
     .order("name")
@@ -31,8 +31,14 @@ export async function searchCatalog(db, { city, country, industry, keyword, page
       country: row.country,
       needsReview: row.needs_review,
       release: row.source_release,
-      source_url: "https://explore.overturemaps.org/",
-      directory: "Overture",
+      source_url: row.listing_source === "Foursquare"
+        ? "https://docs.foursquare.com/data-products/docs/fsq-places-open-source"
+        : "https://explore.overturemaps.org/",
+      directory: row.listing_source,
+      catalog: true,
+      emailEvidence: webUrl(row.email_evidence_url),
+      phoneEvidence: webUrl(row.phone_evidence_url),
+      contactCheckedAt: row.contact_checked_at,
     })),
     hasMore: data.length > pageSize && page < 250,
   };
