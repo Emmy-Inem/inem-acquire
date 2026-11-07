@@ -97,6 +97,9 @@ async function setup(label) {
 try {
   const a = await setup("A"),
     b = await setup("B");
+  for (const resource of ["offers","icps","prospects","contacts","lists","campaigns","deals","tasks","reports","messages","diagnoses","jobs","integration_connections","billing_accounts","audit_events","memberships","campaign_recipients","list_contacts"]) {
+    const listed=await a.send("get","/resources/"+resource);assert.equal(listed.status,200,resource+" list failed");
+  }
   let r = await a.send("post", "/resources/offers", {
     name: "Acme QA offer",
     description: "Help retailers acquire customers",

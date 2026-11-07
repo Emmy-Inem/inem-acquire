@@ -10,7 +10,7 @@ Deno.serve(async req=>{try{
  if(action==='list'){
   let query=db.from(resource).select('*',{count:'exact'}).eq('organization_id',org);
   if(input.search){const field=resource==='contacts'?'full_name':['deals','tasks'].includes(resource)?'title':['offers','icps','prospects','lists','campaigns','reports'].includes(resource)?'name':null;if(field)query=query.ilike(field,`%${input.search.replace(/[\\%_]/g,'\\$&')}%`);}
-  const result=await query.order('created_at',{ascending:false}).range(input.offset,input.offset+input.limit-1);checked(result);return json({data:result.data,count:result.count});
+  const result=await query.order(resource==='billing_accounts'?'updated_at':'created_at',{ascending:false}).range(input.offset,input.offset+input.limit-1);checked(result);return json({data:result.data,count:result.count});
  }
  if(action==='delete'){
   if(!id)throw new HttpError(400,'Record ID required');if(!Object.hasOwn((await import('../../../shared/resources.js')).resourceSchemas,resource))throw new HttpError(403,'This resource is managed by the platform');
