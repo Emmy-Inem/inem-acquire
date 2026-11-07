@@ -75,7 +75,7 @@ if (batch !== "websites") console.log("Foursquare listings added", await addRows
 if (batch === "snapshot") process.exit(0);
 
 const entries = (await readFile(evidence, "utf8")).split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
-const added = [], changed = new Set();
+const added = [], updates = [], changed = new Set();
 let emailsAdded = 0, phonesAdded = 0;
 for (const item of entries) {
   if (item.status !== "found") continue;
@@ -105,20 +105,21 @@ for (const item of entries) {
   }
   for (const [field, value, source] of [["email", address, item.emailEvidence], ["phone", telephone, item.phoneEvidence]]) {
     if (!value) continue;
-    const result = requireSuccess(await db.from("discovery_catalog")
-      .update({ [field]: value, [field + "_evidence_url"]: webUrl(source), contact_checked_at: item.checkedAt })
-      .eq("overture_place_id", row.id).eq("website", website).is(field, null).select("overture_place_id"));
+    updates.push({ id: row.id, website, field, value, source, checkedAt: item.checkedAt });
     if (field === "email") keySets.emails.add(value);
     else keySets.phones.add(value);
-    if (result.length) {
-      changed.add(row.id);
-      if (field === "email") {
-        emailsAdded += 1;
-      } else {
-        phonesAdded += 1;
-      }
-    }
   }
+}
+for (let offset = 0; offset < updates.length; offset += 8) {
+  await Promise.all(updates.slice(offset, offset + 8).map(async ({ id, website, field, value, source, checkedAt }) => {
+    const rows = requireSuccess(await db.from("discovery_catalog")
+      .update({ [field]: value, [field + "_evidence_url"]: webUrl(source), contact_checked_at: checkedAt })
+      .eq("overture_place_id", id).eq("website", website).is(field, null).select("overture_place_id"));
+    if (!rows.length) return;
+    changed.add(id);
+    if (field === "email") emailsAdded += 1;
+    else phonesAdded += 1;
+  }));
 }
 console.log("Website evidence", JSON.stringify({
   checkedSites: entries.length,
