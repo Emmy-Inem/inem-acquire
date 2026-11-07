@@ -70,9 +70,16 @@ try {
     .getByText("Password updated. You can return to your workspace.", {
       exact: true,
     })
-    .waitFor();
+    .waitFor()
+    .catch(async () => {
+      const message = await page
+        .locator(".liveError")
+        .textContent()
+        .catch(() => "No error shown");
+      throw new Error("Password update failed: " + message);
+    });
   console.log(
-    "PASS emailed recovery link establishes a session and saves a six-character password",
+    "PASS real recovery link establishes a session and saves a six-character password",
   );
   const client = createClient(
     process.env.SUPABASE_URL,
@@ -153,16 +160,7 @@ try {
     "PASS token-hash recovery callback reaches reset form and updates password",
   );
   assert.deepEqual(errors, []);
-  // Deliberately use our disposable fixture, never a customer's mailbox.
-  const delivery = await client.auth.resetPasswordForEmail(email, {
-    redirectTo: base + "/reset-password",
-  });
-  console.log(
-    "RESET_EMAIL_DELIVERY",
-    delivery.error
-      ? { status: delivery.error.status, code: delivery.error.code }
-      : "accepted by Supabase",
-  );
+  // generateLink validates the live recovery flow without sending mail or consuming the email quota.
 } finally {
   if (browser) await browser.close();
   if (user) {
