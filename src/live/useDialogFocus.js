@@ -1,12 +1,15 @@
 import { useEffect, useRef } from "react";
-export function useDialogFocus(active, onClose) {
+export function useDialogFocus(active, onClose, containerRef) {
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
     if (!active) return;
     const previous = document.activeElement;
-    const dialog = document.querySelector('[role="dialog"]');
+    const dialog =
+      containerRef?.current || document.querySelector('[role="dialog"]');
     if (!dialog) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const selector =
       'button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]';
     const focusable = () =>
@@ -15,7 +18,7 @@ export function useDialogFocus(active, onClose) {
       );
     const frame = requestAnimationFrame(() => {
       const target = dialog.querySelector("[autofocus]") || focusable()[0];
-      target?.focus();
+      target?.focus({ preventScroll: true });
     });
     const handle = (e) => {
       if (e.key === "Escape") {
@@ -39,11 +42,18 @@ export function useDialogFocus(active, onClose) {
         first.focus();
       }
     };
-    dialog.addEventListener("keydown", handle);
+    const containFocus = (event) => {
+      if (!dialog.contains(event.target))
+        focusable()[0]?.focus({ preventScroll: true });
+    };
+    document.addEventListener("keydown", handle);
+    document.addEventListener("focusin", containFocus);
     return () => {
       cancelAnimationFrame(frame);
-      dialog.removeEventListener("keydown", handle);
-      previous?.focus?.();
+      document.removeEventListener("keydown", handle);
+      document.removeEventListener("focusin", containFocus);
+      document.body.style.overflow = previousOverflow;
+      if (previous?.isConnected) previous.focus?.({ preventScroll: true });
     };
   }, [active]);
 }

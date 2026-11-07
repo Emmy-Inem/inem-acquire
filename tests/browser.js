@@ -30,8 +30,56 @@ try {
   browser = await chromium.launch({ channel: "chrome", headless: true });
   const page = await browser.newPage({
     viewport: { width: 1440, height: 900 },
+    hasTouch: true,
   });
   page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("http://127.0.0.1:5173/");
+  const navigationToggle = page.getByRole("button", {
+    name: "Toggle navigation",
+  });
+  await navigationToggle.tap();
+  const publicMenu = page.getByRole("dialog", { name: "Site navigation" });
+  await publicMenu.waitFor();
+  assert(
+    await publicMenu.evaluate((el) =>
+      getComputedStyle(el).backdropFilter.includes("20px"),
+    ),
+    "Mobile menu has no glass blur",
+  );
+  assert(
+    await page.evaluate(() => document.body.style.overflow === "hidden"),
+    "Page scroll not locked under menu",
+  );
+  assert(
+    await navigationToggle.evaluate(
+      (el) =>
+        getComputedStyle(el).webkitTapHighlightColor === "rgba(0, 0, 0, 0)",
+    ),
+    "Touch tap rectangle remains enabled",
+  );
+  await page.keyboard.press("Escape");
+  await publicMenu.waitFor({ state: "hidden" });
+  assert(
+    await navigationToggle.evaluate((el) => el === document.activeElement),
+    "Menu did not restore trigger focus",
+  );
+  await navigationToggle.tap();
+  await page
+    .getByRole("navigation", { name: "Mobile navigation", exact: true })
+    .getByRole("link", { name: "Features", exact: false })
+    .click();
+  await publicMenu.waitFor({ state: "hidden" });
+  for (const name of ["Understand", "Discover", "Engage", "Convert"]) {
+    await page.getByRole("tab", { name, exact: true }).click();
+    assert(
+      (await page
+        .getByRole("tab", { name, exact: true })
+        .getAttribute("aria-selected")) === "true",
+      "Workflow tab did not respond",
+    );
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("http://127.0.0.1:5173/app/dashboard");
   await page.waitForURL("**/login");
   assert(
@@ -134,9 +182,35 @@ try {
     "Mobile page overflows",
   );
   await page.getByRole("button", { name: "Open menu", exact: true }).click();
+  assert(
+    (await page.locator(".appSide").getAttribute("inert")) === null,
+    "Open drawer remains inert",
+  );
   await page.getByRole("link", { name: "Contacts", exact: true }).click();
   await page.getByRole("heading", { name: "Contacts", exact: true }).waitFor();
+  assert(
+    (await page.locator(".appSide").getAttribute("inert")) !== null,
+    "Closed drawer is keyboard-focusable",
+  );
   await page.getByRole("button", { name: "Add contact", exact: true }).click();
+  const contactDialog = page.getByRole("dialog");
+  assert(
+    await contactDialog.evaluate(
+      (el) => el.getBoundingClientRect().width <= innerWidth - 24,
+    ),
+    "Dialog is clipped on mobile",
+  );
+  await page.keyboard.press("Shift+Tab");
+  assert(
+    await contactDialog.evaluate((el) => el.contains(document.activeElement)),
+    "Dialog focus escaped",
+  );
+  assert(
+    await page
+      .getByLabel("Full name", { exact: true })
+      .evaluate((el) => parseInt(getComputedStyle(el).fontSize) >= 16),
+    "Mobile form text triggers input zoom",
+  );
   await page.getByLabel("Full name", { exact: true }).fill("Test Contact");
   await page.getByLabel("Email", { exact: true }).fill("test@example.com");
   await page.getByRole("button", { name: "Save record", exact: true }).click();
@@ -145,7 +219,44 @@ try {
     path: out + "/contacts-390x844.png",
     fullPage: true,
   });
-  assert(!await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),"Contacts table overflows the mobile page");
+  assert(
+    !(await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    )),
+    "Contacts table overflows the mobile page",
+  );
+  await page.getByRole("button", { name: "Open menu", exact: true }).click();
+  await page.getByRole("link", { name: "Team & roles", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Team & roles", exact: true })
+    .waitFor();
+  assert(
+    (await page.locator(".appSide").getAttribute("inert")) !== null,
+    "Manage menu links do not close drawer",
+  );
+  await page.goto("http://127.0.0.1:5173/app/admin");
+  await page.getByRole("heading", { name: "Platform owner", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Manage organization", exact: false }).first().waitFor();
+  assert(!await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), "Platform owner console overflows on mobile");
+  await page.screenshot({ path: out + "/owner-390x844.png", fullPage: true });
+  const reduced = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    reducedMotion: "reduce",
+  });
+  await reduced.goto("http://127.0.0.1:5173/");
+  assert(
+    (await reduced.locator("video source").count()) === 0,
+    "Reduced motion downloads background video",
+  );
+  await reduced.getByRole("button", { name: "Toggle navigation" }).click();
+  await reduced.getByRole("dialog", { name: "Site navigation" }).waitFor();
+  assert(
+    await reduced
+      .getByRole("dialog")
+      .evaluate((el) => getComputedStyle(el).transform === "none"),
+    "Reduced-motion menu still slides",
+  );
+  await reduced.close();
   assert(errors.length === 0, errors.join("\n"));
   console.log(
     "PASS desktop/mobile, real sign-in, persistence, roles and browser session handling",

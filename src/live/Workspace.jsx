@@ -1,5 +1,6 @@
 import { useDialogFocus } from "./useDialogFocus";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useMediaQuery } from "../useMediaQuery";
 import {
   Link,
   NavLink,
@@ -276,6 +277,12 @@ export function LiveWorkspace() {
     navigate = useNavigate();
   const section = (params["*"] || "dashboard").split("/")[0];
   const [mobile, setMobile] = useState(false);
+  const compact = useMediaQuery("(max-width: 820px)");
+  const navigationRef = useRef(null);
+  useDialogFocus(mobile && compact, () => setMobile(false), navigationRef);
+  useEffect(() => {
+    setMobile(false);
+  }, [section, compact]);
   const role = organization?.role;
   const write = role === "platform_support" || canRole(role, "write"),
     approve = role === "platform_support" || canRole(role, "approve"),
@@ -295,7 +302,18 @@ export function LiveWorkspace() {
     .toUpperCase();
   return (
     <div className="appShell">
-      <aside className={"appSide " + (mobile ? "open" : "")}>
+      <aside
+        ref={navigationRef}
+        id="workspace-navigation"
+        className={"appSide " + (mobile ? "open" : "")}
+        role={compact && mobile ? "dialog" : undefined}
+        aria-modal={compact && mobile ? true : undefined}
+        aria-label="Workspace navigation"
+        inert={compact && !mobile}
+        onClick={(event) => {
+          if (event.target.closest("a[href]")) setMobile(false);
+        }}
+      >
         <div className="sideTop">
           <LiveBrand />
           <button aria-label="Close menu" onClick={() => setMobile(false)}>
@@ -387,11 +405,13 @@ export function LiveWorkspace() {
           </div>
         </div>
       </aside>
-      <div className="appBody">
+      <div className="appBody" inert={compact && mobile}>
         <header className="appTop">
           <button
             className="menuBtn"
             aria-label="Open menu"
+            aria-expanded={mobile}
+            aria-controls="workspace-navigation"
             onClick={() => setMobile(true)}
           >
             <Menu />
@@ -483,7 +503,6 @@ function Header({ title, description, children }) {
   );
 }
 function RecordForm({ resource, record, onClose, onSaved }) {
-  useDialogFocus(true, onClose);
   const config = modules[resource],
     request = useOrgApi();
   const [values, setValues] = useState(() => {
@@ -497,6 +516,9 @@ function RecordForm({ resource, record, onClose, onSaved }) {
     [references, setReferences] = useState({}),
     [pending, setPending] = useState(false),
     [error, setError] = useState("");
+  useDialogFocus(true, () => {
+    if (!pending) onClose();
+  });
   useEffect(() => {
     const controller = new AbortController();
     Promise.all(
@@ -518,13 +540,6 @@ function RecordForm({ resource, record, onClose, onSaved }) {
       });
     return () => controller.abort();
   }, [resource, request]);
-  useEffect(() => {
-    const fn = (e) => {
-      if (e.key === "Escape" && !pending) onClose();
-    };
-    document.addEventListener("keydown", fn);
-    return () => document.removeEventListener("keydown", fn);
-  }, [pending, onClose]);
   return (
     <div className="liveModalBackdrop">
       <section
@@ -811,7 +826,15 @@ function ResourcePage({ resource, write, approve }) {
               : false
           }
         >
-          <div className="tableScroll">
+          <p className="tableHint">
+            Swipe across to see all details and actions.
+          </p>
+          <div
+            className="tableScroll"
+            role="region"
+            aria-label={config.title + " records"}
+            tabIndex={0}
+          >
             <table>
               <thead>
                 <tr>
@@ -947,8 +970,10 @@ function ResourcePage({ resource, write, approve }) {
   );
 }
 function Confirm({ title, detail, onCancel, onConfirm }) {
-  useDialogFocus(true, onCancel);
   const [pending, setPending] = useState(false);
+  useDialogFocus(true, () => {
+    if (!pending) onCancel();
+  });
   return (
     <div className="liveModalBackdrop">
       <section
@@ -1272,7 +1297,12 @@ function PipelinePage({ write }) {
         </Link>
       </Header>
       <State loading={!rows && !error} error={error} retry={load}>
-        <section className="kanban liveKanban">
+        <section
+          className="kanban liveKanban"
+          role="region"
+          aria-label="Sales pipeline"
+          tabIndex={0}
+        >
           {[
             "qualified",
             "meeting",

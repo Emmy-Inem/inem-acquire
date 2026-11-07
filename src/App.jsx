@@ -4,7 +4,9 @@ import { LiveWorkspace } from "./live/Workspace";
 import { AnimatedPreview } from "./PlatformMotion";
 import WorkflowPreview from "./WorkflowPreview";
 import HeroVideo from "./HeroVideo";
-import React, { useMemo, useState } from "react";
+import MobileMenu from "./MobileMenu";
+import { useMediaQuery } from "./useMediaQuery";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import {
   Link,
   NavLink,
@@ -166,6 +168,12 @@ function Button({
 }
 function PublicNav({ dark = false, onePage = false }) {
   const [open, setOpen] = useState(false);
+  const compact = useMediaQuery("(max-width: 820px)");
+  const menuId = useId();
+  const { pathname } = useLocation();
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname, compact]);
   const items = [
     ["How it works", "how-it-works"],
     ["Features", "features"],
@@ -173,37 +181,79 @@ function PublicNav({ dark = false, onePage = false }) {
     ["Pricing", "pricing"],
   ];
   return (
-    <header className={"publicNav " + (dark ? "darkNav" : "")}>
-      <Brand />
-      <nav className={open ? "open" : ""}>
-        {items.map(([label, id]) =>
-          onePage ? (
-            <a href={"#" + id} key={id} onClick={() => setOpen(false)}>
-              {label}
-            </a>
-          ) : (
-            <NavLink to={"/" + id} key={id}>
-              {label}
-            </NavLink>
-          ),
-        )}
-      </nav>
-      <div className="navActions">
-        <Link to="/login" className="textLink">
-          Log in
-        </Link>
-        <Button as={Link} to="/signup">
-          Get started <ArrowRight size={15} />
-        </Button>
-        <button
-          aria-label="Toggle navigation"
-          className="mobileMenu"
-          onClick={() => setOpen(!open)}
-        >
-          {open ? <X /> : <Menu />}
-        </button>
-      </div>
-    </header>
+    <>
+      <header className={"publicNav " + (dark ? "darkNav" : "")}>
+        <Brand />
+        <nav aria-label="Main navigation" className="desktopNavigation">
+          {items.map(([label, id]) =>
+            onePage ? (
+              <a href={"#" + id} key={id} onClick={() => setOpen(false)}>
+                {label}
+              </a>
+            ) : (
+              <NavLink to={"/" + id} key={id}>
+                {label}
+              </NavLink>
+            ),
+          )}
+        </nav>
+        <div className="navActions">
+          <Link to="/login" className="textLink">
+            Log in
+          </Link>
+          <Button as={Link} to="/signup">
+            Get started <ArrowRight size={15} />
+          </Button>
+          <button
+            aria-label="Toggle navigation"
+            aria-expanded={open}
+            aria-controls={menuId}
+            className="mobileMenu"
+            onClick={() => setOpen(!open)}
+          >
+            {open ? <X /> : <Menu />}
+          </button>
+        </div>
+      </header>
+      <MobileMenu
+        open={open && compact}
+        onClose={() => setOpen(false)}
+        id={menuId}
+      >
+        <nav aria-label="Mobile navigation">
+          {items.map(([label, id]) =>
+            onePage ? (
+              <a key={id} href={"#" + id} onClick={() => setOpen(false)}>
+                {label}
+                <ArrowRight size={18} />
+              </a>
+            ) : (
+              <NavLink key={id} to={"/" + id} onClick={() => setOpen(false)}>
+                {label}
+                <ArrowRight size={18} />
+              </NavLink>
+            ),
+          )}
+        </nav>
+        <div className="publicMobileActions">
+          <Link
+            to="/login"
+            className="btn glass"
+            onClick={() => setOpen(false)}
+          >
+            Log in
+          </Link>
+          <Link
+            to="/signup"
+            className="btn primary"
+            onClick={() => setOpen(false)}
+          >
+            Get started
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+      </MobileMenu>
+    </>
   );
 }
 function PublicFooter() {
@@ -312,9 +362,7 @@ function Home() {
   return (
     <div className="marketingSite">
       <PublicNav dark onePage />
-      <div
-        className="heroFrame"
-      >
+      <div className="heroFrame">
         <HeroVideo />
         <section className="humanHero">
           <div className="heroCopy">
