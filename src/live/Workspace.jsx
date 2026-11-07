@@ -770,6 +770,13 @@ function ResourcePage({ resource, write, approve }) {
   const config = modules[resource],
     request = useOrgApi(),
     { organization } = useAuth();
+  const canResearch = resource === "prospects" && write;
+  const [prospectView, setProspectView] = useState(() =>
+    new URLSearchParams(window.location.search).has("search")
+      ? "saved"
+      : "research",
+  );
+  const showRecords = !canResearch || prospectView === "saved";
   const [rows, setRows] = useState([]),
     [count, setCount] = useState(0),
     [offset, setOffset] = useState(0),
@@ -864,7 +871,7 @@ function ResourcePage({ resource, write, approve }) {
           ["prospects", "contacts", "deals", "tasks"].includes(resource) && (
             <button className="btn secondary" onClick={exportData}>
               <Download size={16} />
-              Export
+              {resource === "prospects" ? "Export saved" : "Export"}
             </button>
           )}
         {write && (
@@ -882,136 +889,164 @@ function ResourcePage({ resource, write, approve }) {
           {notice}
         </div>
       )}
-      {resource === "prospects" && write && (
-        <div className="resourceTools">
-          <details>
-            <summary>Import companies from CSV</summary>
-            <CsvImport onImported={load} />
-          </details>
-          <ProspectResearch onSaved={load} />
-        </div>
-      )}
-      <form
-        className="liveSearch"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setOffset(0);
-          setQuery(search);
-        }}
-      >
-        <Search size={17} />
-        <input
-          aria-label={"Search " + config.title}
-          placeholder={"Search " + config.title.toLowerCase()}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <button className="btn secondary">Search</button>
-      </form>
-      <section className="panel liveRecords">
-        <State
-          loading={loading}
-          error={error}
-          retry={load}
-          empty={
-            !rows.length
-              ? "Add your first record, or adjust your search."
-              : false
-          }
-        >
-          <p className="tableHint">
-            Swipe across to see all details and actions.
-          </p>
+      {canResearch && (
+        <>
           <div
-            className="tableScroll"
-            role="region"
-            aria-label={config.title + " records"}
-            tabIndex={0}
+            className="leadViewSwitch"
+            aria-label="Prospect views"
+            role="group"
           >
-            <table>
-              <thead>
-                <tr>
-                  {config.columns.map((c) => (
-                    <th key={c}>{titleCase(c)}</th>
-                  ))}
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    {config.columns.map((column) => (
-                      <td key={column}>{display(row[column], column)}</td>
+            <button
+              aria-pressed={prospectView === "research"}
+              onClick={() => setProspectView("research")}
+            >
+              Discover leads
+            </button>
+            <button
+              aria-pressed={prospectView === "saved"}
+              onClick={() => setProspectView("saved")}
+            >
+              Saved prospects <span>{count}</span>
+            </button>
+          </div>
+          <div hidden={showRecords}>
+            <ProspectResearch onSaved={load} />
+          </div>
+        </>
+      )}
+      <div hidden={!showRecords}>
+        {canResearch && (
+          <div className="resourceTools">
+            <details>
+              <summary>Import companies from CSV</summary>
+              <CsvImport onImported={load} />
+            </details>
+          </div>
+        )}
+        <form
+          className="liveSearch"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setOffset(0);
+            setQuery(search);
+          }}
+        >
+          <Search size={17} />
+          <input
+            aria-label={"Search " + config.title}
+            placeholder={"Search " + config.title.toLowerCase()}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <button className="btn secondary">Search</button>
+        </form>
+        <section className="panel liveRecords">
+          <State
+            loading={loading}
+            error={error}
+            retry={load}
+            empty={
+              !rows.length
+                ? "Add your first record, or adjust your search."
+                : false
+            }
+          >
+            <p className="tableHint">
+              Swipe across to see all details and actions.
+            </p>
+            <div
+              className="tableScroll"
+              role="region"
+              aria-label={config.title + " records"}
+              tabIndex={0}
+            >
+              <table>
+                <thead>
+                  <tr>
+                    {config.columns.map((c) => (
+                      <th key={c}>{titleCase(c)}</th>
                     ))}
-                    <td>
-                      <div className="liveRowActions">
-                        {write && (
-                          <button onClick={() => setEditing(row)}>Edit</button>
-                        )}
-                        {approve &&
-                          (resource !== "campaigns" ||
-                            row.status === "draft") && (
-                            <button onClick={() => setDeleting(row.id)}>
-                              Delete
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.id}>
+                      {config.columns.map((column) => (
+                        <td key={column}>{display(row[column], column)}</td>
+                      ))}
+                      <td>
+                        <div className="liveRowActions">
+                          {write && (
+                            <button onClick={() => setEditing(row)}>
+                              Edit
                             </button>
                           )}
-                        {resource === "campaigns" && (
-                          <>
-                            {
-                              <button onClick={() => setSelected(row.id)}>
-                                Recipients
-                              </button>
-                            }
-                            {approve && row.status === "draft" && (
-                              <button
-                                disabled={actionPending}
-                                onClick={() => action(row.id, "approve")}
-                              >
-                                Approve
+                          {approve &&
+                            (resource !== "campaigns" ||
+                              row.status === "draft") && (
+                              <button onClick={() => setDeleting(row.id)}>
+                                Delete
                               </button>
                             )}
-                            {approve && row.status === "approved" && (
-                              <button
-                                onClick={() => {
-                                  setSelected("send:" + row.id);
-                                }}
-                              >
-                                Send
-                              </button>
-                            )}
-                          </>
-                        )}
-                        {resource === "lists" && (
-                          <button onClick={() => setSelected(row.id)}>
-                            Contacts
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          {resource === "campaigns" && (
+                            <>
+                              {
+                                <button onClick={() => setSelected(row.id)}>
+                                  Recipients
+                                </button>
+                              }
+                              {approve && row.status === "draft" && (
+                                <button
+                                  disabled={actionPending}
+                                  onClick={() => action(row.id, "approve")}
+                                >
+                                  Approve
+                                </button>
+                              )}
+                              {approve && row.status === "approved" && (
+                                <button
+                                  onClick={() => {
+                                    setSelected("send:" + row.id);
+                                  }}
+                                >
+                                  Send
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {resource === "lists" && (
+                            <button onClick={() => setSelected(row.id)}>
+                              Contacts
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </State>
+          <div className="pagination">
+            <span>{count} records</span>
+            <div>
+              <button
+                disabled={!offset || loading}
+                onClick={() => setOffset(Math.max(0, offset - 25))}
+              >
+                Previous
+              </button>
+              <button
+                disabled={offset + 25 >= count || loading}
+                onClick={() => setOffset(offset + 25)}
+              >
+                Next
+              </button>
+            </div>
           </div>
-        </State>
-        <div className="pagination">
-          <span>{count} records</span>
-          <div>
-            <button
-              disabled={!offset || loading}
-              onClick={() => setOffset(Math.max(0, offset - 25))}
-            >
-              Previous
-            </button>
-            <button
-              disabled={offset + 25 >= count || loading}
-              onClick={() => setOffset(offset + 25)}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
       {editing && (
         <RecordForm
           resource={resource}

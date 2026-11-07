@@ -1,10 +1,11 @@
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
 import { request as httpRequest } from "node:http";
-import { load } from "cheerio";
 import ipaddr from "ipaddr.js";
 import robotsParser from "robots-parser";
-import { businessEmail, webUrl } from "./lead-discovery.js";
+import { webUrl } from "./lead-discovery.js";
+import { extractContacts } from "./website-evidence.js";
+export { extractContacts } from "./website-evidence.js";
 
 const agent = "InemAcquireResearch/1.0 (+https://inem-acquire.vercel.app)";
 const MAX_BYTES = 512 * 1024;
@@ -91,41 +92,18 @@ async function fetchPage(value, signal, hops = 0, allowed = () => true) {
   return { ...response, url: url.href };
 }
 
-export function extractContacts(html, source) {
-  const $ = load(html);
-  $("script,style,noscript,template,[hidden],[aria-hidden='true']").remove();
-  const publicText = $("body").text();
-  const links = $("a[href]")
-    .map((_, a) => $(a).attr("href"))
-    .get();
-  const emails = [
-    ...links
-      .filter((link) => /^mailto:/i.test(link))
-      .map((link) => link.slice(7).split("?")[0]),
-    ...(publicText.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || []),
-  ]
-    .map(businessEmail)
-    .filter(Boolean);
-  const phones = links
-    .filter((link) => /^tel:/i.test(link))
-    .map((link) => link.slice(4).trim())
-    .filter((phone) => /^\+?[\d(). -]{7,24}$/.test(phone));
-  return {
-    emails: [...new Set(emails)].slice(0, 5),
-    phones: [...new Set(phones)].slice(0, 5),
-    source,
-    links,
-  };
-}
-
-export async function scanBusinessWebsite(website) {
+export async function scanBusinessWebsite(
+  website,
+  { country, signal: caller } = {},
+) {
   const entry = webUrl(website);
   if (!entry)
     throw Object.assign(
       new Error("Enter a public website address beginning with https://"),
       { status: 400 },
     );
-  const signal = AbortSignal.timeout(10500);
+  const deadline = AbortSignal.timeout(10500);
+  const signal = caller ? AbortSignal.any([caller, deadline]) : deadline;
   try {
     const robotsUrl = new URL("/robots.txt", entry);
     const robots = await fetchPage(robotsUrl.href, signal);
@@ -147,33 +125,63 @@ export async function scanBusinessWebsite(website) {
     const page = await fetchPage(entry, signal, 0, allowed);
     if (page.status !== 200 || !page.text)
       throw new Error("The website did not return an accessible page");
-    const home = extractContacts(page.text, page.url);
-    const contact = home.links
-      .flatMap((link) => {
-        try {
-          return [new URL(link, page.url)];
-        } catch {
-          return [];
-        }
-      })
-      .find(
-        (link) =>
-          link.origin === new URL(page.url).origin &&
-          /\/(?:contact(?:[-_]?us)?|get-in-touch)\/?$/i.test(link.pathname) &&
-          link.href !== page.url &&
-          allowed(link.href),
-      );
+    const home = extractContacts(page.text, page.url, country);
+    const origin = new URL(page.url).origin;
+    const candidates = new Map();
+    const priorities = [
+      /(?:^|\/)(?:contact(?:[-_]?us)?|get-in-touch)(?:\/|$)/i,
+      /(?:^|\/)(?:locations?|offices?|branches|support)(?:\/|$)/i,
+      /(?:^|\/)(?:about(?:[-_]?us)?|company)(?:\/|$)/i,
+    ];
+    for (const link of home.links) {
+      try {
+        const url = new URL(link, page.url);
+        const priority = priorities.findIndex((pattern) =>
+          pattern.test(url.pathname),
+        );
+        url.hash = "";
+        if (
+          priority < 0 ||
+          url.origin !== origin ||
+          url.href === page.url ||
+          !allowed(url.href)
+        )
+          continue;
+        candidates.set(url.href, priority);
+      } catch {
+        // Ignore malformed page links.
+      }
+    }
+    if (
+      ![...candidates.values()].includes(0) &&
+      !home.emails.length &&
+      !home.phones.length
+    ) {
+      const contact = new URL("/contact", origin).href;
+      if (allowed(contact) && contact !== page.url) candidates.set(contact, 0);
+    }
     const results = [home];
-    if (contact) {
-      const other = await fetchPage(contact.href, signal, 0, allowed).catch(
-        () => null,
-      );
+    for (const [url] of [...candidates]
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, 3)) {
+      if (signal.aborted) break;
+      const other = await fetchPage(url, signal, 0, allowed).catch(() => null);
       if (other?.status === 200 && other.text)
-        results.push(extractContacts(other.text, other.url));
+        results.push(extractContacts(other.text, other.url, country));
     }
     return results
-      .filter((row) => row.emails.length || row.phones.length)
-      .map(({ source, emails, phones }) => ({ source, emails, phones }));
+      .filter(
+        (row) =>
+          row.emails.length ||
+          row.phones.length ||
+          Object.values(row.details).some(Boolean),
+      )
+      .map(({ source, emails, phones, details }) => ({
+        source,
+        emails,
+        phones,
+        details,
+      }));
   } catch (error) {
     const messages = [
       "Only public business websites can be checked",

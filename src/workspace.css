@@ -509,24 +509,6 @@
   font-weight: 600;
   min-height: 24px;
 }
-.researchResults {
-  display: grid;
-  gap: 12px;
-  margin-top: 18px;
-}
-.researchResults article {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding-block: 12px;
-  border-top: 1px solid #e2e8f2;
-}
-.researchResults small {
-  display: block;
-  color: #61708a;
-  margin-top: 6px;
-}
 .recipientReview {
   margin-bottom: 24px;
   padding-block: 10px;
@@ -567,51 +549,6 @@
 }
 .resourceTools details[open] summary {
   margin-bottom: 18px;
-}
-.researchPanel > p {
-  font-size: 13px;
-  line-height: 1.8;
-  margin-bottom: 0;
-  color: #61708a;
-}
-.researchPanel > p a {
-  color: #0757f6;
-  text-decoration: underline;
-}
-.researchForm {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
-}
-.researchForm .field {
-  flex: 1 1 150px;
-  margin: 0;
-}
-.researchWebsite {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid #dfe6ef;
-}
-.researchPanel .researchAttribution {
-  margin: 12px 0;
-  font-size: 12px;
-}
-.researchContacts {
-  margin: 8px 0;
-  padding-inline-start: 18px;
-  font-size: 13px;
-  line-height: 1.65;
-  overflow-wrap: anywhere;
-}
-.researchPanel a {
-  color: #0757f6;
-  text-decoration: underline;
-}
-.researchActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 @media (max-width: 1100px) {
   .appShell .appTop {
@@ -729,10 +666,6 @@
   .guideGrid {
     grid-template-columns: 1fr;
   }
-  .researchResults article {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
   .appShell .readinessPanel {
     padding: 20px;
   }
@@ -771,5 +704,238 @@
   }
   .appShell .pageHeader h1 {
     font-size: 26px;
+  }
+}
+
+.leadViewSwitch {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--workspace-line);
+  margin-bottom: 20px;
+}
+.leadViewSwitch button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 0 2px;
+  min-height: 44px;
+  font-size: 13px;
+  color: #52637d;
+}
+.leadViewSwitch button[aria-pressed="true"] {
+  border-color: #0757f6;
+  color: #0757f6;
+  font-weight: 650;
+}
+.leadViewSwitch button span {
+  margin-inline-start: 5px;
+  color: #61708a;
+}
+.leadWorkbench {
+  padding: 22px;
+}
+.leadSearchHeader {
+  margin-bottom: 20px;
+}
+.leadSearchHeader h2 {
+  font-size: 20px;
+  letter-spacing: -0.03em;
+  margin: 0 0 5px;
+}
+.leadSearchHeader p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #52637d;
+  margin: 0;
+}
+.researchForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.researchForm .field {
+  flex: 1 1 150px;
+  min-width: 0;
+  margin: 0;
+}
+.researchForm .leadCountry {
+  flex: 0 1 115px;
+}
+.leadWebsiteEntry {
+  margin-block: 12px;
+}
+.leadWebsiteEntry summary,
+.leadEvidenceLinks summary {
+  color: #0757f6;
+  cursor: pointer;
+  font-size: 12px;
+}
+.leadWebsiteEntry summary {
+  padding-block: 10px;
+}
+.leadWebsiteEntry form {
+  padding-block: 10px;
+}
+.leadResultToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  color: #52637d;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.leadResultToolbar p {
+  flex: 1 1 210px;
+  margin: 0;
+}
+.leadResultToolbar label {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 44px;
+}
+.leadTableScroll {
+  margin-top: 12px;
+  border: 1px solid #e0e7f1;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+.leadTable {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: auto;
+}
+.leadTable th {
+  padding: 12px;
+  background: #f5f8fc;
+  text-align: left;
+  font-weight: 650;
+  color: #465775;
+  white-space: nowrap;
+}
+.leadTable td {
+  padding: 13px 12px;
+  border-top: 1px solid #e8edf5;
+  vertical-align: top;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.leadTable td:first-child {
+  min-width: 155px;
+}
+.leadTable td:nth-child(2) {
+  min-width: 154px;
+}
+.leadTable td:nth-child(3) {
+  min-width: 119px;
+}
+.leadTable td:nth-child(4) {
+  min-width: 150px;
+}
+.leadTable a,
+.leadCredit a {
+  color: #0757f6;
+}
+.leadWebsite {
+  display: block;
+  margin-top: 3px;
+}
+.leadEvidenceLinks {
+  margin-top: 5px;
+}
+.leadEvidenceLinks a {
+  display: block;
+  font-size: 12px;
+}
+.leadCompanyFacts {
+  display: grid;
+  gap: 4px;
+}
+.leadContactList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.leadMuted,
+.leadCredit,
+.leadEmpty {
+  color: #52637d;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.leadCredit {
+  margin: 10px 0 0;
+}
+.leadActions {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 6px;
+}
+.leadActions button {
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .leadWorkbench {
+    padding: 16px;
+  }
+  .researchForm .leadCountry {
+    flex: 1 1 100px;
+  }
+  .researchForm button {
+    flex: 1 1 100%;
+  }
+  .leadWebsiteEntry summary {
+    min-height: 44px;
+  }
+  .leadTableScroll {
+    border: 0;
+  }
+  .leadTable {
+    display: block;
+    min-width: 0;
+  }
+  .leadTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .leadTable tbody {
+    display: grid;
+    gap: 12px;
+  }
+  .leadTable tr {
+    display: grid;
+    border: 1px solid #e0e7f1;
+    border-radius: 10px;
+  }
+  .leadTable td {
+    padding: 9px 12px;
+    min-width: 0 !important;
+  }
+  .leadTable td:first-child {
+    border-top: 0;
+    background: #f8faff;
+    border-radius: 10px 10px 0 0;
+  }
+  .leadTable td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: #52637d;
+    font-size: 11px;
+    font-weight: 650;
+    margin-bottom: 3px;
+  }
+  .leadActions {
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 }

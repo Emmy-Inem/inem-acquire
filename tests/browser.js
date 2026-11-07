@@ -356,13 +356,69 @@ try {
   await listDialog.getByRole("button", { name: "Close", exact: true }).click();
   await page.goto(base + "/app/prospects");
   await page
-    .getByText("Find companies and public contacts", { exact: true })
-    .click();
+    .getByRole("heading", { name: "Find companies and public contacts" })
+    .waitFor();
   await page
     .getByRole("button", { name: "Find companies", exact: true })
     .waitFor();
+  await page.getByText("Research by website", { exact: true }).click();
+  await page.getByLabel("Business websites", { exact: true }).waitFor();
+  await page.route("**/api/prospects/enrich", async (route) => {
+    await route.fulfill({
+      contentType: "application/x-ndjson",
+      body:
+        JSON.stringify({
+          index: 0,
+          contacts: [
+            {
+              source: "https://example.org/contact",
+              emails: ["sales@example.org"],
+              phones: ["+12025550100"],
+              details: {
+                name: "Example business",
+                address: "1 Example Street",
+              },
+            },
+          ],
+        }) + "\n",
+    });
+  });
   await page
-    .getByLabel("Check any public business website", { exact: true })
+    .getByLabel("Business websites", { exact: true })
+    .fill("example.org");
+  await page
+    .getByRole("button", { name: "Check websites", exact: true })
+    .click();
+  await page
+    .getByRole("link", { name: "sales@example.org", exact: true })
+    .waitFor();
+  await page.getByRole("link", { name: "+12025550100", exact: true }).waitFor();
+  await page.getByText("1 Example Street", { exact: true }).waitFor();
+  assert(
+    (await page
+      .getByText("© OpenStreetMap contributors", { exact: true })
+      .count()) === 0,
+    "Unrelated attribution is shown",
+  );
+  const leadLayout = await page.evaluate(() => ({
+    viewport: innerWidth,
+    width: document.documentElement.scrollWidth,
+    wide: [...document.querySelectorAll(".leadWorkbench *")].filter(el => el.getBoundingClientRect().right > innerWidth).map(el=>el.tagName+"."+el.className).slice(0,10),
+  }));
+  assert(leadLayout.width <= leadLayout.viewport, "Lead results overflow mobile: " + JSON.stringify(leadLayout));
+  await page
+    .getByRole("button", { name: "Save prospect", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Saved", exact: true }).waitFor();
+  await page.getByRole("button", { name: /Saved prospects/ }).click();
+  await page
+    .getByRole("cell", { name: "Example business", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Discover leads", exact: true })
+    .click();
+  await page
+    .getByRole("link", { name: "sales@example.org", exact: true })
     .waitFor();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForFunction(

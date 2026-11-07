@@ -1,18 +1,65 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { industries } from "../../shared/research";
 import { api } from "./api";
 import { useAuth } from "./AuthContext";
 
-function ContactDetails({ rows }) {
-  if (!rows?.length) return null;
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+async function streamEnrichment(organizationId, websites, signal, onRow) {
+  const response = await fetch("/api/prospects/enrich", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      "x-organization-id": organizationId,
+    },
+    body: JSON.stringify({ websites }),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.error || "Website research could not start.");
+  }
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) if (line) onRow(JSON.parse(line));
+    }
+    if (buffer.trim()) onRow(JSON.parse(buffer));
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function contactInfo(row, checked) {
+  const pages = checked?.contacts || [];
+  return {
+    emails: unique([row.email, ...pages.flatMap((page) => page.emails)]),
+    phones: unique([row.phone, ...pages.flatMap((page) => page.phones)]),
+    address:
+      pages.find((page) => page.details?.address)?.details.address ||
+      row.address,
+    employees: pages.find((page) => page.details?.employees)?.details.employees,
+    linkedin: pages.find((page) => page.details?.linkedin)?.details.linkedin,
+    pages,
+  };
+}
+
+function ContactColumn({ values, type, status }) {
+  if (!values.length) return <span className="leadMuted">{status}</span>;
   return (
-    <ul className="researchContacts">
-      {rows.map((row) => (
-        <li key={row.source}>
-          {[...row.emails, ...row.phones].join(" · ")}{" "}
-          <a href={row.source} target="_blank" rel="noreferrer">
-            Source
-          </a>
+    <ul className="leadContactList">
+      {values.map((value) => (
+        <li key={value}>
+          <a href={type + ":" + value}>{value}</a>
         </li>
       ))}
     </ul>
@@ -24,87 +71,189 @@ export default function ProspectResearch({ onSaved }) {
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("NG");
   const [industry, setIndustry] = useState("technology");
-  const [website, setWebsite] = useState("");
+  const [websites, setWebsites] = useState("");
   const [rows, setRows] = useState([]);
-  const [websiteResults, setWebsiteResults] = useState([]);
   const [checked, setChecked] = useState({});
+  const [checking, setChecking] = useState([]);
   const [saved, setSaved] = useState({});
-  const [pending, setPending] = useState("");
+  const [saving, setSaving] = useState("");
+  const [phase, setPhase] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [websiteNotice, setWebsiteNotice] = useState("");
-  const request = (path, body) =>
-    api(path, { method: "POST", body, organizationId: organization.id });
-  async function run(key, action) {
-    setPending(key);
-    setError("");
-    try {
-      await action();
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setPending("");
-    }
-  }
+  const [contactsOnly, setContactsOnly] = useState(false);
+  const controller = useRef(null);
+  useEffect(() => () => controller.current?.abort(), []);
 
-  async function scan(value, key) {
-    await run(key, async () => {
-      const normalized = /^https?:\/\//i.test(value)
-        ? value
-        : "https://" + value;
-      const { contacts } = await request("/prospects/check-website", {
-        website: normalized,
-      });
-      if (key === "website") {
-        setWebsiteResults(contacts);
-        setWebsiteNotice(
-          contacts.length
-            ? ""
-            : "No public business email or phone found on these pages.",
-        );
-      } else {
-        setChecked((current) => ({ ...current, [key]: contacts }));
-      }
+  function request(path, body, signal) {
+    return api(path, {
+      method: "POST",
+      body,
+      signal,
+      organizationId: organization.id,
     });
   }
 
+  async function enrich(companies, job, defaultCountry) {
+    const targets = companies.filter((row) => row.website).slice(0, 12);
+    if (!targets.length) return;
+    setPhase("checking");
+    setChecking(targets.map((row) => row.source_url));
+    const report = (key, result) =>
+      setChecked((current) => ({ ...current, [key]: result }));
+    const remaining = new Set(targets.map((row) => row.source_url));
+    try {
+      await streamEnrichment(
+        organization.id,
+        targets.map((row) => ({
+          website: row.website,
+          country: row.country || defaultCountry,
+        })),
+        job.signal,
+        (result) => {
+          const key = targets[result.index]?.source_url;
+          if (!key) return;
+          remaining.delete(key);
+          report(key, result);
+        },
+      );
+      for (const key of remaining)
+        report(key, { error: "Website check interrupted." });
+    } catch (error) {
+      if (!job.signal.aborted) {
+        for (const key of remaining)
+          report(key, { error: "Website check unavailable." });
+        throw error;
+      }
+    } finally {
+      setChecking([]);
+    }
+  }
+
+  async function start(load, defaultCountry) {
+    if (controller.current) return;
+    const job = new AbortController();
+    controller.current = job;
+    setPhase("searching");
+    setError("");
+    setNotice("");
+    setRows([]);
+    setChecked({});
+    setContactsOnly(false);
+    try {
+      const result = await load(job.signal);
+      if (job.signal.aborted) return;
+      setRows(result.companies);
+      setNotice(
+        result.companies.length
+          ? result.ranked
+            ? "Gemini prioritized the matching categories."
+            : ""
+          : "No companies matched. Try a nearby city or another industry.",
+      );
+      await enrich(result.companies, job, defaultCountry);
+    } catch (error) {
+      if (!job.signal.aborted) setError(error.message);
+    } finally {
+      if (controller.current === job) {
+        controller.current = null;
+        setPhase("");
+      }
+    }
+  }
+
+  function checkLinks(event) {
+    event.preventDefault();
+    const lines = unique(websites.split(/[\n,]+/).map((value) => value.trim()));
+    if (lines.length < 1 || lines.length > 12) {
+      setError("Enter 1 to 12 business websites.");
+      return;
+    }
+    try {
+      const companies = lines.map((line) => {
+        const url = new URL(
+          /^https?:\/\//i.test(line) ? line : "https://" + line,
+        );
+        if (
+          !["http:", "https:"].includes(url.protocol) ||
+          !url.hostname.includes(".") ||
+          url.username ||
+          url.password
+        )
+          throw new Error("Enter valid public website addresses.");
+        url.hash = "";
+        return {
+          name: url.hostname.replace(/^www\./, ""),
+          website: url.href,
+          source_url: url.href,
+        };
+      });
+      start(
+        () => ({
+          companies: [
+            ...new Map(companies.map((row) => [row.source_url, row])).values(),
+          ],
+        }),
+        country,
+      );
+    } catch {
+      setError("Enter valid public website addresses.");
+    }
+  }
+
+  const complete = rows.filter((row) => checked[row.source_url]).length;
+  const withContacts = rows.filter((row) => {
+    const info = contactInfo(row, checked[row.source_url]);
+    return info.emails.length || info.phones.length;
+  });
+  const shown = contactsOnly ? withContacts : rows;
+
   return (
-    <details className="researchPanel">
-      <summary>Find companies and public contacts</summary>
+    <section
+      className="panel leadWorkbench"
+      aria-labelledby="lead-finder-title"
+    >
+      <div className="leadSearchHeader">
+        <div>
+          <h2 id="lead-finder-title">Find companies and public contacts</h2>
+          <p>
+            Search by location and industry. Contact details appear as each
+            website is checked.
+          </p>
+        </div>
+      </div>
       <form
         className="researchForm"
         onSubmit={(event) => {
           event.preventDefault();
-          run("search", async () => {
-            setRows([]);
-            setNotice("");
-            const result = await request("/prospects/public-directory", {
-              city: city.trim(),
-              country,
-              industry,
-            });
-            setRows(result.companies);
-            setNotice(
-              result.companies.length
-                ? result.ranked
-                  ? "Gemini prioritized the business categories. Review each company and source before saving."
-                  : "Review each company and source before saving."
-                : "No mapped businesses matched. Try a nearby city or a different industry.",
+          start(async (signal) => {
+            const location = city.trim();
+            const result = await request(
+              "/prospects/public-directory",
+              { city: location, country, industry },
+              signal,
             );
-          });
+            return {
+              ...result,
+              companies: result.companies.map((row) => ({
+                ...row,
+                city: location,
+              })),
+            };
+          }, country);
         }}
       >
         <label className="field">
           <span>City</span>
           <input
             required
+            minLength={2}
             maxLength={75}
             value={city}
             onChange={(e) => setCity(e.target.value)}
             placeholder="e.g. Lagos"
           />
         </label>
-        <label className="field">
+        <label className="field leadCountry">
           <span>Country code</span>
           <input
             required
@@ -112,7 +261,6 @@ export default function ProspectResearch({ onSaved }) {
             maxLength={2}
             value={country}
             onChange={(e) => setCountry(e.target.value.toUpperCase())}
-            placeholder="NG"
           />
         </label>
         <label className="field">
@@ -129,153 +277,283 @@ export default function ProspectResearch({ onSaved }) {
             ))}
           </select>
         </label>
-        <button className="btn primary" disabled={!!pending}>
-          {pending === "search" ? "Finding companies…" : "Find companies"}
+        <button className="btn primary" disabled={!!phase}>
+          {phase === "searching" ? "Finding companies…" : "Find companies"}
         </button>
       </form>
-      <p className="researchAttribution">
-        <a
-          href="https://www.openstreetmap.org/copyright"
-          target="_blank"
-          rel="noreferrer"
-        >
-          © OpenStreetMap contributors · ODbL
-        </a>
-        {" · "}
-        <a
-          href="https://www.wikidata.org/wiki/Wikidata:Licensing"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Wikidata · CC0
-        </a>
-      </p>
+      <details className="leadWebsiteEntry">
+        <summary>Research by website</summary>
+        <form className="researchForm" onSubmit={checkLinks}>
+          <label className="field">
+            <span>Business websites</span>
+            <textarea
+              required
+              maxLength={6200}
+              rows={3}
+              value={websites}
+              onChange={(e) => setWebsites(e.target.value)}
+              placeholder="Enter up to 12 websites, one per line"
+            />
+          </label>
+          <button className="btn secondary" disabled={!!phase}>
+            Check websites
+          </button>
+        </form>
+      </details>
       {error && (
         <p className="liveError" role="alert">
           {error}
         </p>
       )}
-      {notice && <p role="status">{notice}</p>}
-      <div className="researchResults">
-        {rows.map((row) => {
-          const key = row.source_url;
-          const contacts = [
-            ...(row.email || row.phone
-              ? [
-                  {
-                    emails: row.email ? [row.email] : [],
-                    phones: row.phone ? [row.phone] : [],
-                    source: key,
-                  },
-                ]
-              : []),
-            ...(checked[key] || []),
-          ];
-          return (
-            <article key={key}>
-              <div>
-                <strong>{row.name}</strong>
-                <p>
-                  {row.industry} ·{" "}
-                  <a href={key} target="_blank" rel="noreferrer">
-                    {row.directory || "Directory listing"}
-                  </a>
-                  {row.website && (
-                    <>
-                      {" "}
-                      ·{" "}
-                      <a href={row.website} target="_blank" rel="noreferrer">
-                        Website
-                      </a>
-                    </>
-                  )}
-                </p>
-                <ContactDetails rows={contacts} />
-                {checked[key]?.length === 0 && (
-                  <p>No public business contact found on the website.</p>
-                )}
-              </div>
-              <div className="researchActions">
-                {row.website && (
-                  <button
-                    className="btn secondary"
-                    disabled={!!pending || !!checked[key]}
-                    onClick={() => scan(row.website, key)}
-                  >
-                    {pending === key
-                      ? "Checking…"
-                      : checked[key]
-                        ? "Checked"
-                        : "Check website"}
-                  </button>
-                )}
-                <button
-                  className="btn secondary"
-                  disabled={!!pending || !!saved[key]}
-                  onClick={() =>
-                    run("save:" + key, async () => {
-                      const { name, industry, country, website, source_url } =
-                        row;
-                      await request("/resources/prospects", {
-                        name,
-                        industry,
-                        country,
-                        website,
-                        source_url,
-                        notes: [
-                          row.directory === "Wikidata"
-                            ? "Directory: Wikidata (CC0)"
-                            : "Directory: © OpenStreetMap contributors (ODbL), https://www.openstreetmap.org/copyright",
-                          ...contacts.map((contact) =>
-                            [
-                              contact.source,
-                              ...contact.emails,
-                              ...contact.phones,
-                            ].join(" · "),
-                          ),
-                        ].join("\n"),
-                      });
-                      setSaved((current) => ({ ...current, [key]: true }));
-                      onSaved();
-                    })
-                  }
-                >
-                  {saved[key]
-                    ? "Saved"
-                    : pending === "save:" + key
-                      ? "Saving…"
-                      : "Save prospect"}
-                </button>
-              </div>
-            </article>
-          );
-        })}
+      <div className="leadResultToolbar">
+        <p role="status">
+          {rows.length
+            ? `${rows.length} ${rows.length === 1 ? "company" : "companies"} · ${withContacts.length} with contact details · ${complete} ${complete === 1 ? "website" : "websites"} checked`
+            : notice || (phase ? "Finding matching companies…" : "")}
+        </p>
+        {phase && (
+          <button
+            className="btn secondary"
+            onClick={() => controller.current?.abort()}
+          >
+            Stop research
+          </button>
+        )}
+        {!!rows.length && (
+          <label>
+            <input
+              type="checkbox"
+              checked={contactsOnly}
+              onChange={(e) => setContactsOnly(e.target.checked)}
+            />{" "}
+            With contact details
+          </label>
+        )}
       </div>
-      <form
-        className="researchForm researchWebsite"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setWebsiteResults([]);
-          setWebsiteNotice("");
-          scan(website.trim(), "website");
-        }}
-      >
-        <label className="field">
-          <span>Check any public business website</span>
-          <input
-            required
-            maxLength={500}
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            placeholder="company.com"
-          />
-        </label>
-        <button className="btn secondary" disabled={!!pending}>
-          {pending === "website" ? "Checking…" : "Find contact details"}
-        </button>
-      </form>
-      {websiteNotice && <p role="status">{websiteNotice}</p>}
-      <ContactDetails rows={websiteResults} />
-    </details>
+      {rows.length > 0 && (
+        <>
+          {notice && <p className="leadMuted">{notice}</p>}
+          {shown.length ? (
+            <div
+              className="tableScroll leadTableScroll"
+              role="region"
+              aria-label="Lead results"
+              tabIndex={0}
+            >
+              <table className="leadTable">
+                <thead>
+                  <tr>
+                    <th scope="col">Company</th>
+                    <th scope="col">Business email</th>
+                    <th scope="col">Phone</th>
+                    <th scope="col">Company details</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((row) => {
+                    const key = row.source_url;
+                    const result = checked[key];
+                    const info = contactInfo(row, result);
+                    const waiting = checking.includes(key) && !result;
+                    const status = waiting
+                      ? "Checking…"
+                      : result?.error
+                        ? "Unavailable"
+                        : result
+                          ? "Not published"
+                          : row.website
+                            ? "Not checked"
+                            : "No website";
+                    return (
+                      <tr key={key}>
+                        <td>
+                          <strong>
+                            {info.pages.find((page) => page.details?.name)
+                              ?.details.name || row.name}
+                          </strong>
+                          {row.website && (
+                            <a
+                              className="leadWebsite"
+                              href={row.website}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {new URL(row.website).hostname}
+                            </a>
+                          )}
+                          <details className="leadEvidenceLinks">
+                            <summary>Sources</summary>
+                            <a href={key} target="_blank" rel="noreferrer">
+                              Company listing
+                            </a>
+                            {info.pages
+                              .filter((page) => page.source !== key)
+                              .map((page, index) => (
+                                <a
+                                  key={page.source}
+                                  href={page.source}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Website page {index + 1}
+                                </a>
+                              ))}
+                          </details>
+                        </td>
+                        <td data-label="Business email">
+                          <ContactColumn
+                            type="mailto"
+                            values={info.emails}
+                            status={status}
+                          />
+                        </td>
+                        <td data-label="Phone">
+                          <ContactColumn
+                            type="tel"
+                            values={info.phones}
+                            status={status}
+                          />
+                        </td>
+                        <td data-label="Company details">
+                          <div className="leadCompanyFacts">
+                            <span>
+                              {[row.industry, row.city, row.country]
+                                .filter(Boolean)
+                                .join(" · ") || "Website research"}
+                            </span>
+                            {info.address && <span>{info.address}</span>}
+                            {info.employees && (
+                              <span>{info.employees} employees</span>
+                            )}
+                            {info.linkedin && (
+                              <a
+                                href={info.linkedin}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                LinkedIn company page
+                              </a>
+                            )}
+                            {result?.error && (
+                              <span className="leadMuted">{result.error}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="leadActions">
+                            {row.website &&
+                              (!result || result.error) &&
+                              !phase && (
+                                <button
+                                  className="btn secondary"
+                                  onClick={async () => {
+                                    if (controller.current) return;
+                                    const job = new AbortController();
+                                    controller.current = job;
+                                    setError("");
+                                    setChecked((current) => {
+                                      const next = { ...current };
+                                      delete next[key];
+                                      return next;
+                                    });
+                                    try {
+                                      await enrich([row], job, country);
+                                    } catch (error) {
+                                      if (!job.signal.aborted)
+                                        setError(error.message);
+                                    } finally {
+                                      if (controller.current === job) {
+                                        controller.current = null;
+                                        setPhase("");
+                                      }
+                                    }
+                                  }}
+                                >
+                                  Check website
+                                </button>
+                              )}
+                            <button
+                              className="btn secondary"
+                              disabled={waiting || !!saving || !!saved[key]}
+                              onClick={async () => {
+                                setSaving(key);
+                                setError("");
+                                try {
+                                  const notes = [
+                                    row.directory === "OpenStreetMap" &&
+                                      "© OpenStreetMap contributors · ODbL · https://www.openstreetmap.org/copyright",
+                                    info.address && "Address: " + info.address,
+                                    info.employees &&
+                                      "Employees: " + info.employees,
+                                    info.linkedin,
+                                    ...info.pages.map((page) =>
+                                      [
+                                        page.source,
+                                        ...page.emails,
+                                        ...page.phones,
+                                      ].join(" · "),
+                                    ),
+                                    ...[row.email, row.phone].filter(Boolean),
+                                  ]
+                                    .filter(Boolean)
+                                    .join("\n");
+                                  await request("/resources/prospects", {
+                                    name:
+                                      info.pages.find(
+                                        (page) => page.details?.name,
+                                      )?.details.name || row.name,
+                                    website: row.website,
+                                    industry: row.industry,
+                                    country: row.country,
+                                    source_url: key,
+                                    notes,
+                                  });
+                                  setSaved((current) => ({
+                                    ...current,
+                                    [key]: true,
+                                  }));
+                                  onSaved();
+                                } catch (error) {
+                                  setError(error.message);
+                                } finally {
+                                  setSaving("");
+                                }
+                              }}
+                            >
+                              {saved[key]
+                                ? "Saved"
+                                : saving === key
+                                  ? "Saving…"
+                                  : "Save prospect"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="leadEmpty">
+              No results with public email or phone details yet.
+            </p>
+          )}
+          {shown.some((row) => row.directory === "OpenStreetMap") && (
+            <p className="leadCredit">
+              <a
+                href="https://www.openstreetmap.org/copyright"
+                target="_blank"
+                rel="noreferrer"
+              >
+                © OpenStreetMap contributors
+              </a>{" "}
+              · ODbL
+            </p>
+          )}
+        </>
+      )}
+    </section>
   );
 }

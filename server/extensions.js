@@ -305,11 +305,9 @@ export function extensionRoutes(
     limit: 5,
     keyGenerator: (req) => req.user.id,
     handler: (_req, res) =>
-      res
-        .status(429)
-        .json({
-          error: "Please wait a minute before making another research request.",
-        }),
+      res.status(429).json({
+        error: "Please wait a minute before making another research request.",
+      }),
   });
   app.post(
     "/api/prospects/public-directory",
@@ -348,6 +346,60 @@ export function extensionRoutes(
         .strict()
         .parse(req.body);
       res.json({ contacts: await scanBusinessWebsite(website) });
+    }),
+  );
+  app.post(
+    "/api/prospects/enrich",
+    auth,
+    organization("write"),
+    researchLimit,
+    wrap(async (req, res) => {
+      const { websites } = z
+        .object({
+          websites: z
+            .array(
+              z
+                .object({
+                  website: z.string().trim().max(500).url(),
+                  country: z
+                    .string()
+                    .regex(/^[A-Z]{2}$/)
+                    .optional(),
+                })
+                .strict(),
+            )
+            .min(1)
+            .max(12),
+        })
+        .strict()
+        .parse(req.body);
+      const stop = new AbortController();
+      res.on("close", () => stop.abort());
+      res.type("application/x-ndjson");
+      res.set("X-Accel-Buffering", "no");
+      res.flushHeaders();
+      let cursor = 0;
+      const worker = async () => {
+        while (!stop.signal.aborted && cursor < websites.length) {
+          const index = cursor++;
+          const { website, country } = websites[index];
+          let row;
+          try {
+            const contacts = await scanBusinessWebsite(website, {
+              country,
+              signal: stop.signal,
+            });
+            row = { index, contacts };
+          } catch (error) {
+            row = { index, error: error.message };
+          }
+          if (!stop.signal.aborted) res.write(JSON.stringify(row) + "\n");
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(4, websites.length) }, worker),
+      );
+      if (!stop.signal.aborted) res.end();
     }),
   );
   app.post(

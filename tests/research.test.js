@@ -26,6 +26,24 @@ test("website scans reject loopback, link-local, and IPv4-mapped loopback", asyn
   }
 });
 
+test("published organization markup adds company facts and normalizes phone numbers", () => {
+  const row = extractContacts(
+    `<script type="application/ld+json">
+    {"@graph":[{"@type":"Organization","name":"Example HQ","address":{"streetAddress":"12 Example St","addressLocality":"Lagos"},"numberOfEmployees":{"value":32},"sameAs":["https://www.linkedin.com/company/example/"],"contactPoint":{"email":"sales@example.org","telephone":"0803 123 4567"}},{"@type":"Person","email":"admin@private.example","telephone":"+12025550123"}]}
+    </script>`,
+    "https://example.org/contact",
+    "NG",
+  );
+  assert.deepEqual(row.emails, ["sales@example.org"]);
+  assert.deepEqual(row.phones, ["+2348031234567"]);
+  assert.deepEqual(row.details, {
+    name: "Example HQ",
+    address: "12 Example St, Lagos",
+    linkedin: "https://www.linkedin.com/company/example/",
+    employees: "32",
+  });
+});
+
 test("directory results preserve attribution, omit private inboxes, and reuse a cached search", async (t) => {
   const fetch = t.mock.method(globalThis, "fetch", async (url) => {
     if (url.hostname === "query.wikidata.org")
