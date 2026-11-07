@@ -328,7 +328,7 @@ try {
   assert.equal(ownerDirectory.status, 200);
   assert.ok(ownerDirectory.body.organizations.some((org) => org.id === a.org));
   const nameQuery = encodeURIComponent("QA organization " + a.id.slice(0, 6));
-  const found = await b.agent.get("/api/platform/organizations?search=" + nameQuery);
+  const found = await b.agent.get("/api/platform/organizations?path=platform%2Forganizations&search=" + nameQuery);
   assert.equal(found.status, 200, found.body.error);
   assert.deepEqual(found.body.organizations.map((org) => org.id), [a.org]);
   assert.equal(found.body.organizations[0].operation_status, "routine");

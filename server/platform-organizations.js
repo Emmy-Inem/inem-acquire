@@ -24,7 +24,12 @@ export function platformOrganizationRoutes(app, { admin, result, wrap }) {
       search: z.string().trim().max(120).default(""),
       status: z.enum(["all", ...statuses]).default("all"),
       page: z.coerce.number().int().min(1).max(1_000_000).default(1),
-    }).strict().parse(req.query);
+    }).parse({
+      // Vercel also forwards its own rewrite path as a query parameter.
+      search: req.query.search,
+      status: req.query.status,
+      page: req.query.page,
+    });
     const offset = (page - 1) * pageSize;
     let query = admin().from("platform_organization_directory")
       .select(directoryFields, { count: "exact" })
