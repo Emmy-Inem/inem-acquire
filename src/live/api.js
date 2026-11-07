@@ -18,6 +18,7 @@ export async function api(
   if (!response.ok)
     throw Object.assign(new Error(data.error || "Request failed"), {
       status: response.status,
+      code: data.code,
     });
   return data;
 }

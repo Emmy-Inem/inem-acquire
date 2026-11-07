@@ -133,11 +133,60 @@ export function createApp({
   app.use(express.json({ limit: "1mb" }));
   const credentials = z
     .object({
-      email: z.string().email().max(254),
+      email: z.string().trim().toLowerCase().email().max(254),
       password: z.string().min(6).max(128),
       full_name: z.string().trim().min(2).max(120).optional(),
     })
     .strict();
+  const authFailure = (res, error, action) => {
+    if (
+      error.status === 429 ||
+      ["over_email_send_rate_limit", "over_request_rate_limit"].includes(
+        error.code,
+      )
+    )
+      return res
+        .status(429)
+        .json({
+          code: "auth_rate_limited",
+          error:
+            "Too many attempts. Please wait a few minutes before trying again.",
+        });
+    if (
+      [
+        "email_address_not_authorized",
+        "email_provider_disabled",
+        "smtp_send_failed",
+      ].includes(error.code) ||
+      error.status >= 500
+    )
+      return res
+        .status(503)
+        .json({
+          code: "auth_service_unavailable",
+          error:
+            action === "login"
+              ? "Sign-in is temporarily unavailable. Please try again shortly."
+              : "We could not send your verification email. Please try again shortly or contact support.",
+        });
+    if (error.code === "email_not_confirmed")
+      return res
+        .status(403)
+        .json({
+          code: "email_not_confirmed",
+          error:
+            "Confirm your email address before signing in. Check your inbox or request a new confirmation link below.",
+        });
+    return res.status(action === "login" ? 401 : 400).json({
+      code: action === "login" ? "invalid_credentials" : "signup_failed",
+      error:
+        action === "login"
+          ? "Email or password is incorrect."
+          : error.code === "weak_password"
+            ? "Use a password with at least 6 characters."
+            : "Unable to create account. Check your details, or try signing in if you already registered.",
+    });
+  };
   app.post(
     "/api/auth/signup",
     wrap(async (req, res) => {
@@ -151,11 +200,7 @@ export function createApp({
           emailRedirectTo: origin + "/auth/callback",
         },
       });
-      if (error)
-        return res.status(400).json({
-          error:
-            "Unable to create account. Check your details or try signing in.",
-        });
+      if (error) return authFailure(res, error, "signup");
       if (auth.session) setSession(res, auth.session);
       res.status(201).json({
         user: auth.user ? { id: auth.user.id, email: auth.user.email } : null,
@@ -170,13 +215,27 @@ export function createApp({
       const data = credentials.omit({ full_name: true }).parse(req.body);
       const { data: auth, error } =
         await makeClient().auth.signInWithPassword(data);
-      if (error || !auth.session)
-        return res.status(401).json({
-          error:
-            "Email or password is incorrect, or the email has not been verified.",
-        });
+      if (error || !auth.session) return authFailure(res, error || {}, "login");
       setSession(res, auth.session);
       res.json({ user: { id: auth.user.id, email: auth.user.email } });
+    }),
+  );
+  app.post(
+    "/api/auth/resend-verification",
+    wrap(async (req, res) => {
+      configured();
+      const { email } = credentials.pick({ email: true }).parse(req.body);
+      const { error } = await makeClient().auth.resend({
+        type: "signup",
+        email,
+        options: { emailRedirectTo: origin + "/auth/callback" },
+      });
+      if (error) return authFailure(res, error, "signup");
+      res.json({
+        success: true,
+        message:
+          "If this account needs confirmation, a new verification link has been sent.",
+      });
     }),
   );
   app.post(
@@ -378,21 +437,17 @@ export function createApp({
         refresh_token: req.refreshToken || "",
       });
       if (sessionError || !restored.session)
-        return res
-          .status(401)
-          .json({
-            error: "Your reset session expired. Request a new reset link.",
-          });
+        return res.status(401).json({
+          error: "Your reset session expired. Request a new reset link.",
+        });
       const { error } = await db.auth.updateUser({ password });
       if (error)
-        return res
-          .status(400)
-          .json({
-            error:
-              error.code === "same_password"
-                ? "Choose a different password from your current one."
-                : "Password could not be updated. Use at least 6 characters and try again.",
-          });
+        return res.status(400).json({
+          error:
+            error.code === "same_password"
+              ? "Choose a different password from your current one."
+              : "Password could not be updated. Use at least 6 characters and try again.",
+        });
       setSession(res, restored.session);
       res.json({ success: true });
     }),

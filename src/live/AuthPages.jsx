@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { api } from "./api";
 import { useAuth } from "./AuthContext";
+import PasswordField from "./PasswordField";
 export function LiveBrand() {
   return (
     <Link className="brand" to="/" aria-label="Inem Acquire home">
@@ -36,6 +37,8 @@ export function AuthPage({ mode }) {
     ),
     [resetReady, setResetReady] = useState(false),
     [error, setError] = useState(""),
+    [errorCode, setErrorCode] = useState(""),
+    [verificationSent, setVerificationSent] = useState(false),
     [notice, setNotice] = useState("");
   const title = {
     login: "Welcome back",
@@ -122,12 +125,17 @@ export function AuthPage({ mode }) {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    setErrorCode("");
     setPending(true);
     try {
       if (mode === "signup") {
         const response = await api("/auth/signup", {
           method: "POST",
-          body: { email, password, full_name: name },
+          body: {
+            email: email.trim().toLowerCase(),
+            password,
+            full_name: name,
+          },
         });
         if (response.needsVerification) {
           setNotice(
@@ -139,7 +147,10 @@ export function AuthPage({ mode }) {
         navigate("/onboarding/welcome");
       }
       if (mode === "login") {
-        await api("/auth/login", { method: "POST", body: { email, password } });
+        await api("/auth/login", {
+          method: "POST",
+          body: { email: email.trim().toLowerCase(), password },
+        });
         await refresh();
         navigate(location.state?.from || "/app/dashboard");
       }
@@ -166,6 +177,7 @@ export function AuthPage({ mode }) {
       }
     } catch (e) {
       setError(e.message);
+      setErrorCode(e.code || "");
     } finally {
       setPending(false);
     }
@@ -238,26 +250,16 @@ export function AuthPage({ mode }) {
                 </label>
               )}
               {["signup", "login", "reset-password"].includes(mode) && (
-                <label className="field">
-                  <span>
-                    {mode === "reset-password" ? "New password" : "Password"}
-                  </span>
-                  <input
-                    type="password"
-                    aria-label={
-                      mode === "reset-password" ? "New password" : "Password"
-                    }
-                    autoComplete={
-                      mode === "login" ? "current-password" : "new-password"
-                    }
-                    required
-                    minLength={6}
-                    maxLength={128}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <small>Use at least 6 characters.</small>
-                </label>
+                <PasswordField
+                  label={
+                    mode === "reset-password" ? "New password" : "Password"
+                  }
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               )}
               {mode === "invite" && (
                 <p>
@@ -299,6 +301,37 @@ export function AuthPage({ mode }) {
                 New to Inem Acquire? <Link to="/signup">Create an account</Link>
               </p>
             </>
+          )}
+          {(errorCode === "email_not_confirmed" ||
+            (mode === "signup" && notice)) && (
+            <button
+              type="button"
+              className="authResend"
+              disabled={pending}
+              onClick={async () => {
+                setPending(true);
+                setError("");
+                try {
+                  await api("/auth/resend-verification", {
+                    method: "POST",
+                    body: { email: email.trim().toLowerCase() },
+                  });
+                  setVerificationSent(true);
+                } catch (e) {
+                  setError(e.message);
+                } finally {
+                  setPending(false);
+                }
+              }}
+            >
+              {pending ? "Sending…" : "Resend confirmation email"}
+            </button>
+          )}
+          {verificationSent && (
+            <p className="liveNotice" role="status">
+              If this account needs confirmation, a new verification link has
+              been sent. Open the latest email.
+            </p>
           )}
           {mode === "signup" && (
             <p className="switch">

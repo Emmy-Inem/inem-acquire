@@ -88,6 +88,23 @@ try {
   );
   await page.getByLabel("Email address", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
+  const passwordInput = page.getByLabel("Password", { exact: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Show password", exact: true }).tap();
+  assert(
+    (await passwordInput.getAttribute("type")) === "text",
+    "Password is not visible after tapping the eye",
+  );
+  assert(
+    (await passwordInput.inputValue()) === password,
+    "Password changed when toggled",
+  );
+  await page.getByRole("button", { name: "Hide password", exact: true }).tap();
+  assert(
+    (await passwordInput.getAttribute("type")) === "password",
+    "Password cannot be hidden again",
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL("**/onboarding/welcome");
   await page
@@ -235,9 +252,19 @@ try {
     "Manage menu links do not close drawer",
   );
   await page.goto("http://127.0.0.1:5173/app/admin");
-  await page.getByRole("heading", { name: "Platform owner", exact: true }).waitFor();
-  await page.getByRole("button", { name: "Manage organization", exact: false }).first().waitFor();
-  assert(!await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), "Platform owner console overflows on mobile");
+  await page
+    .getByRole("heading", { name: "Platform owner", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Manage organization", exact: false })
+    .first()
+    .waitFor();
+  assert(
+    !(await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    )),
+    "Platform owner console overflows on mobile",
+  );
   await page.screenshot({ path: out + "/owner-390x844.png", fullPage: true });
   const reduced = await browser.newPage({
     viewport: { width: 390, height: 844 },

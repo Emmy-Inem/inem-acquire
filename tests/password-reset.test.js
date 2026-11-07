@@ -44,6 +44,57 @@ test("signup and login accept six characters and reject five", async () => {
   assert.equal(calls.length, 2);
 });
 
+test("auth reports email delivery limits and unconfirmed accounts clearly", async () => {
+  let failure = { code: "email_address_not_authorized", status: 400 };
+  const app = createApp({
+    env,
+    clientFactory: () => ({
+      auth: {
+        signUp: async () => ({ error: failure }),
+        signInWithPassword: async () => ({ error: failure }),
+      },
+    }),
+  });
+  const body = { email: "QA@example.com", password: "abcdef" };
+  const unavailable = await post(app, "signup", body);
+  assert.equal(unavailable.status, 503);
+  assert.match(unavailable.body.error, /verification email/);
+  failure = { code: "over_email_send_rate_limit", status: 429 };
+  assert.equal((await post(app, "signup", body)).status, 429);
+  failure = { code: "email_not_confirmed", status: 400 };
+  const unconfirmed = await post(app, "login", body);
+  assert.equal(unconfirmed.status, 403);
+  assert.equal(unconfirmed.body.code, "email_not_confirmed");
+  failure = { code: "invalid_credentials", status: 400 };
+  assert.equal((await post(app, "login", body)).status, 401);
+});
+
+test("confirmation resend normalizes the address and uses the app callback", async () => {
+  let calls = 0;
+  const app = createApp({
+    env,
+    clientFactory: () => ({
+      auth: {
+        resend: async (payload) => {
+          calls++;
+          assert.deepEqual(payload, {
+            type: "signup",
+            email: "qa@example.com",
+            options: { emailRedirectTo: env.APP_URL + "/auth/callback" },
+          });
+          return { data: {}, error: null };
+        },
+      },
+    }),
+  });
+  const response = await post(app, "resend-verification", {
+    email: "  QA@EXAMPLE.COM ",
+  });
+  assert.equal(response.status, 200);
+  assert.match(response.body.message, /If this account needs confirmation/);
+  assert.equal(calls, 1);
+});
+
 test("reset email uses the production return URL and surfaces delivery failure", async () => {
   let failure = null;
   const app = createApp({

@@ -43,6 +43,51 @@
   color: #0757f6;
   font-size: 12px;
 }
+.passwordField > label {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.passwordInput {
+  position: relative;
+  width: 100%;
+}
+.field.passwordField .passwordInput > input {
+  display: block;
+  width: 100%;
+  padding-right: 58px;
+}
+.passwordInput > button {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #52647e;
+  padding: 10px;
+}
+.passwordInput > button:hover {
+  background: #eaf1ff;
+}
+.passwordInput > button:active {
+  background: #dce8ff;
+}
+.authResend {
+  background: transparent;
+  color: #0757f6;
+  border: 0;
+  border-radius: 8px;
+  min-height: 44px;
+  padding: 10px 0;
+  margin-top: 12px;
+  font: inherit;
+}
 .liveSetup {
   max-width: 660px;
   margin: 45px auto;
@@ -477,4 +522,18 @@
     gap: 12px;
   }
 }
-.liveRecords{min-width:0;max-width:100%;overflow:hidden}.liveRecords .tableScroll{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}.liveRecords table{width:max-content;min-width:100%}
+.liveRecords {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+.liveRecords .tableScroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.liveRecords table {
+  width: max-content;
+  min-width: 100%;
+}
