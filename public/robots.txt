@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /app/
+Disallow: /platform
+Disallow: /support/
+Disallow: /onboarding/
+Disallow: /auth/
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /invite/
+
+Sitemap: https://inem-acquire.vercel.app/sitemap.xml

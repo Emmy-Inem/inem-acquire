@@ -1,5 +1,13 @@
 import { searchCatalog } from "../server/discovery-catalog.js";
 import { websiteIdentity } from "../server/website-identity.js";
+import {
+  checkDomainDns,
+  findGleifEntities,
+  findWaybackSnapshot,
+  getExchangeRates,
+  getUpcomingHolidays,
+  lookupDomainRdap,
+} from "../server/free-intelligence.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -199,4 +207,110 @@ test("catalog reveals a display host while withholding unverified or stale websi
   assert.equal(unsafe.websiteHost, null);
   assert.equal(unsafe.hasWebsite, false);
   assert.equal("total" in result, false);
+});
+
+test("free keyless intelligence APIs verify DNS MX, RDAP, Wayback, GLEIF, FX and holidays", async (t) => {
+  t.mock.method(globalThis, "fetch", async (target) => {
+    const url = new URL(target);
+    if (url.hostname === "cloudflare-dns.com") {
+      return Response.json({
+        Status: 0,
+        Answer: [{ type: 15, data: "10 mx.acme-ng.example." }],
+      });
+    }
+    if (url.hostname === "rdap.org") {
+      return Response.json({
+        ldhName: "acme-ng.example",
+        status: ["active"],
+        events: [
+          { eventAction: "registration", eventDate: "2018-04-10T00:00:00Z" },
+          { eventAction: "expiration", eventDate: "2028-04-10T00:00:00Z" },
+        ],
+      });
+    }
+    if (url.hostname === "archive.org") {
+      return Response.json({
+        archived_snapshots: {
+          closest: {
+            available: true,
+            url: "http://web.archive.org/web/20260101000000/https://acme-ng.example/",
+            timestamp: "20260101000000",
+            status: "200",
+          },
+        },
+      });
+    }
+    if (url.hostname === "api.gleif.org") {
+      return Response.json({
+        data: [
+          {
+            id: "549300EXAMPLELEI0001",
+            attributes: {
+              lei: "549300EXAMPLELEI0001",
+              entity: {
+                legalName: { name: "Acme Logistics Nigeria PLC" },
+                category: "GENERAL",
+                legalAddress: {
+                  addressLines: ["15 Marina Road"],
+                  city: "Lagos",
+                  region: "LA",
+                  country: "NG",
+                },
+              },
+            },
+          },
+        ],
+      });
+    }
+    if (url.hostname === "open.er-api.com") {
+      return Response.json({
+        time_last_update_utc: "2026-11-22T00:00:00Z",
+        rates: { NGN: 1, USD: 0.00062, EUR: 0.00058, GBP: 0.00049 },
+      });
+    }
+    if (url.hostname === "date.nager.at") {
+      return Response.json([
+        {
+          date: "2099-12-25",
+          name: "Christmas Day",
+          localName: "Christmas Day",
+        },
+      ]);
+    }
+    throw new Error("Unexpected URL " + url.href);
+  });
+
+  const dns = await checkDomainDns("https://www.acme-ng.example/contact");
+  assert.equal(dns.domain, "acme-ng.example");
+  assert.equal(dns.hasMx, true);
+  assert.equal(dns.deliverable, true);
+
+  const disposable = await checkDomainDns("user@mailinator.com");
+  assert.equal(disposable.disposable, true);
+  assert.equal(disposable.deliverable, false);
+
+  const rdap = await lookupDomainRdap("acme-ng.example");
+  assert.equal(rdap.active, true);
+  assert.equal(rdap.registeredAt, "2018-04-10T00:00:00Z");
+
+  const wayback = await findWaybackSnapshot("https://acme-ng.example");
+  assert.equal(wayback.available, true);
+  assert.match(wayback.url, /^https:\/\/web\.archive\.org\//);
+
+  const gleif = await findGleifEntities({
+    keyword: "Acme Logistics",
+    city: "Lagos",
+    country: "NG",
+  });
+  assert.equal(gleif.length, 1);
+  assert.equal(gleif[0].name, "Acme Logistics Nigeria PLC");
+  assert.equal(gleif[0].directory, "GLEIF");
+
+  const fx = await getExchangeRates("NGN");
+  assert.equal(fx.base, "NGN");
+  assert.equal(fx.rates.USD, 0.00062);
+
+  const holidays = await getUpcomingHolidays("NG");
+  assert.equal(holidays.length, 1);
+  assert.equal(holidays[0].name, "Christmas Day");
 });

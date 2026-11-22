@@ -167,6 +167,7 @@ function SiteCheck({ row, result, busy, disabled, onCheck }) {
               " phone" +
               (contacts.phones.length === 1 ? "" : "s")
             : ""}
+          {result.dns?.hasMx ? " · Mail server (MX) verified" : ""}
         </p>
       ) : !failed && !unavailable && result?.contacts?.length ? (
         <p className="leadCheckOutcome" role="status">
@@ -174,12 +175,27 @@ function SiteCheck({ row, result, busy, disabled, onCheck }) {
           {contacts.emails.length || contacts.phones.length
             ? "Published contact details found"
             : "No published contacts found"}
+          {result.dns?.hasMx ? " · Mail server (MX) verified" : ""}
         </p>
       ) : failed || unavailable ? (
         <p className="leadCheckOutcome warning" role="status">
           <CircleAlert size={13} />
           {result?.error ||
             "This website could not be reached. Try again later."}
+          {result?.wayback?.url && (
+            <>
+              {" "}
+              ·{" "}
+              <a
+                href={result.wayback.url}
+                target="_blank"
+                rel="noreferrer"
+                className="leadDomain"
+              >
+                Archived copy available
+              </a>
+            </>
+          )}
         </p>
       ) : !website && (row.hasWebsite || row.website) ? (
         <p className="leadCheckHint">

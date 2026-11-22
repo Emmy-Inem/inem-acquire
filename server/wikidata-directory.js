@@ -33,18 +33,33 @@ SELECT DISTINCT ?company ?companyLabel ?website ?sectorLabel WHERE {
   ?sector rdfs:label ?sectorLabel.
   FILTER(LANG(?companyLabel) = "en" && LANG(?sectorLabel) = "en")
 } LIMIT 120`;
-  const endpoint = new URL("https://query.wikidata.org/sparql");
-  endpoint.searchParams.set("query", query);
-  const response = await fetch(endpoint, {
-    headers: {
-      Accept: "application/sparql-results+json",
-      "User-Agent":
-        "InemAcquireResearch/1.0 (+https://inem-acquire.vercel.app)",
-    },
-    signal: AbortSignal.timeout(8500),
-  });
-  if (!response.ok) throw new Error("Wikidata search unavailable");
-  const { results } = await response.json();
+  const endpoints = [
+    "https://query.wikidata.org/sparql",
+    "https://qlever.dev/api/wikidata",
+  ];
+  let payload = null;
+  for (const base of endpoints) {
+    try {
+      const endpoint = new URL(base);
+      endpoint.searchParams.set("query", query);
+      const response = await fetch(endpoint, {
+        headers: {
+          Accept: "application/sparql-results+json",
+          "User-Agent":
+            "InemAcquireResearch/1.0 (+https://inem-acquire.vercel.app)",
+        },
+        signal: AbortSignal.timeout(8500),
+      });
+      if (!response.ok) continue;
+      payload = await response.json();
+      if (Array.isArray(payload?.results?.bindings)) break;
+    } catch {
+      /* Try next free SPARQL endpoint */
+    }
+  }
+  if (!Array.isArray(payload?.results?.bindings))
+    throw new Error("Wikidata search unavailable");
+  const { results } = payload;
   const companies = new Map();
   for (const row of results.bindings) {
     const id = /^https?:\/\/www\.wikidata\.org\/entity\/(Q\d+)$/.exec(

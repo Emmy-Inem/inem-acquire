@@ -1655,12 +1655,17 @@ function Overview({ analytics, write }) {
   const { workspaceBase } = useAuth();
   const request = useOrgApi();
   const [data, setData] = useState(null),
+    [market, setMarket] = useState(null),
     [error, setError] = useState("");
   const load = useCallback(
     () =>
-      request("/dashboard")
-        .then((result) => {
+      Promise.all([
+        request("/dashboard"),
+        request("/market-context").catch(() => null),
+      ])
+        .then(([result, marketContext]) => {
           setData(result);
+          if (marketContext) setMarket(marketContext);
           setError("");
         })
         .catch((e) => setError(e.message)),
@@ -1671,13 +1676,15 @@ function Overview({ analytics, write }) {
   }, [load]);
   const r = data?.records || {},
     open = (r.deals || []).filter((d) => !["won", "lost"].includes(d.stage));
-  const total = (stage) =>
-    (r.deals || [])
-      .filter((d) =>
-        stage ? d.stage === stage : !["won", "lost"].includes(d.stage),
-      )
-      .reduce((sum, d) => sum + Number(d.value), 0);
+  const rates = market?.exchange?.rates || {};
+  const toNgn = (value, currency = "NGN") => {
+    const val = Number(value || 0);
+    if (!currency || currency === "NGN") return val;
+    const rate = rates[currency];
+    return rate && rate > 0 ? val / rate : 0;
+  };
   const currencies = [...new Set((r.deals || []).map((d) => d.currency))];
+  const nextHoliday = market?.holidays?.[0];
   return (
     <>
       <Header
@@ -1692,8 +1699,16 @@ function Overview({ analytics, write }) {
       <State loading={!data && !error} error={error} retry={load}>
         {currencies.length > 1 && (
           <p className="liveNotice">
-            Deal totals below use NGN only. Other currencies remain visible on
-            each deal.
+            {market?.exchange?.provider && market.exchange.provider !== "offline"
+              ? `Multi-currency deal totals are converted to NGN using live ${market.exchange.provider} rates.`
+              : "Deal totals below use NGN only. Other currencies remain visible on each deal."}
+          </p>
+        )}
+        {nextHoliday && (
+          <p className="liveNotice">
+            Outreach calendar note: Upcoming public holiday in{" "}
+            {nextHoliday.countryCode} — <strong>{nextHoliday.name}</strong> (
+            {nextHoliday.date}). Plan campaign sends and follow-ups accordingly.
           </p>
         )}
         <section className="stats">
@@ -1735,8 +1750,8 @@ function Overview({ analytics, write }) {
                 <small>
                   {amount(
                     (r.deals || [])
-                      .filter((d) => d.stage === stage && d.currency === "NGN")
-                      .reduce((s, d) => s + Number(d.value), 0),
+                      .filter((d) => d.stage === stage)
+                      .reduce((s, d) => s + toNgn(d.value, d.currency), 0),
                   )}
                 </small>
               </div>
@@ -2642,6 +2657,53 @@ function ConnectionsPage({ section, manage }) {
             ))
           )}
         </section>
+        {section === "integrations" && (
+          <section className="panel livePanel">
+            <h2>Active free public intelligence APIs (no key required)</h2>
+            {[
+              [
+                "Cloudflare DNS-over-HTTPS (DoH)",
+                "Verifies domain MX and DNS records to check email deliverability before outreach.",
+              ],
+              [
+                "Wikidata & QLever SPARQL Engine",
+                "High-speed international company directory and headquarters lookup with failover.",
+              ],
+              [
+                "OpenStreetMap Overpass Directory",
+                "Public geographic business and industry discovery across cities and regions.",
+              ],
+              [
+                "GLEIF Legal Entity Identifier API",
+                "Global registered corporate legal entities, headquarters and official names.",
+              ],
+              [
+                "RDAP Domain Registration API",
+                "IETF standard domain registration age, expiration and active status verification.",
+              ],
+              [
+                "Internet Archive Wayback Machine API",
+                "Finds archived snapshots when a prospect’s primary website is temporarily offline.",
+              ],
+              [
+                "Open Exchange Rates & Frankfurter FX API",
+                "Live NGN, USD, EUR, GBP and regional currency conversion for pipeline rollups.",
+              ],
+              [
+                "Nager.Date Public Holidays API",
+                "National holiday awareness for Nigeria and international outreach scheduling.",
+              ],
+            ].map(([name, detail]) => (
+              <div className="liveMetric" key={name}>
+                <span>
+                  <b>{name}</b>
+                  <small>{detail}</small>
+                </span>
+                <strong>Active</strong>
+              </div>
+            ))}
+          </section>
+        )}
       </State>
     </>
   );

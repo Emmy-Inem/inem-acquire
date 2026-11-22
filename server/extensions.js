@@ -2,6 +2,13 @@ import {
   corroboratesBusiness,
   resolveBusinessWebsite,
 } from "./website-recovery.js";
+import {
+  checkDomainDns,
+  findWaybackSnapshot,
+  getExchangeRates,
+  getUpcomingHolidays,
+  lookupDomainRdap,
+} from "./free-intelligence.js";
 import { findOutsideCatalog } from "./extended-discovery.js";
 import { searchCatalog } from "./discovery-catalog.js";
 import express from "express";
@@ -590,7 +597,48 @@ export function extensionRoutes(
         .strict()
         .parse(req.body);
       await reserve(req.org);
-      res.json({ contacts: await scanBusinessWebsite(website) });
+      const [contacts, dns, rdap] = await Promise.all([
+        scanBusinessWebsite(website),
+        checkDomainDns(website),
+        lookupDomainRdap(website),
+      ]);
+      res.json({ contacts, dns, rdap });
+    }),
+  );
+  app.post(
+    "/api/prospects/domain-intelligence",
+    auth,
+    organization("read"),
+    catalogLimit,
+    wrap(async (req, res) => {
+      const { domain } = z
+        .object({ domain: z.string().trim().min(3).max(500) })
+        .strict()
+        .parse(req.body);
+      const [dns, rdap, wayback] = await Promise.all([
+        checkDomainDns(domain),
+        lookupDomainRdap(domain),
+        findWaybackSnapshot(domain),
+      ]);
+      res.json({ dns, rdap, wayback });
+    }),
+  );
+  app.get(
+    "/api/market-context",
+    auth,
+    organization("read"),
+    wrap(async (req, res) => {
+      const country = /^[A-Z]{2}$/.test(String(req.query.country || "").toUpperCase())
+        ? String(req.query.country).toUpperCase()
+        : "NG";
+      const base = /^[A-Z]{3}$/.test(String(req.query.base || "").toUpperCase())
+        ? String(req.query.base).toUpperCase()
+        : "NGN";
+      const [exchange, holidays] = await Promise.all([
+        getExchangeRates(base),
+        getUpcomingHolidays(country),
+      ]);
+      res.json({ exchange, holidays });
     }),
   );
   app.post(
@@ -644,14 +692,26 @@ export function extensionRoutes(
               throw new Error(
                 "The business location could not be confirmed on this website.",
               );
+            const firstEmailDomain =
+              contacts
+                .flatMap((c) => c.emails || [])
+                .map((e) => e.split("@")[1])
+                .find(Boolean) || website;
+            const dns = await checkDomainDns(firstEmailDomain, {
+              signal: stop.signal,
+            });
             row = {
               index,
               contacts,
               websiteStatus: name ? "verified" : "unreviewed",
               website: name ? website : null,
+              dns,
             };
           } catch (error) {
-            row = { index, error: error.message };
+            const wayback = await findWaybackSnapshot(website, {
+              signal: stop.signal,
+            });
+            row = { index, error: error.message, ...(wayback ? { wayback } : {}) };
           }
           if (!stop.signal.aborted) res.write(JSON.stringify(row) + "\n");
         }

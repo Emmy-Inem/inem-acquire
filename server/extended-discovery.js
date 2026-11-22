@@ -1,4 +1,5 @@
 import { groundedBusinessSearch } from "./grounded-search.js";
+import { findGleifEntities } from "./free-intelligence.js";
 import { industries } from "../shared/research.js";
 import { askGemini } from "./gemini.js";
 import { findMappedBusinesses, webUrl } from "./lead-discovery.js";
@@ -76,6 +77,9 @@ async function search(env, db, { city, country, industry, keyword }) {
       if (!result.available) throw Object.assign(new Error("Web search unavailable"), {code:result.reason});
       return result.candidates;
     }),
+    ...(original.length >= 2
+      ? [findGleifEntities({ keyword: original, city, country })]
+      : []),
   ]);
   const live = sources
     .flatMap((source) => (source.status === "fulfilled" ? source.value : []))
