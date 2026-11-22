@@ -2816,42 +2816,44 @@ function ProviderCard({ provider, manage, request, onUpdated }) {
       )}
 
       {manage ? (
-        <div className="integrationCardActions">
-          <button
-            type="button"
-            className="btn primary"
-            disabled={!!busy}
-            onClick={() => {
-              setOpen((v) => !v);
-              setFeedback(null);
-            }}
-          >
-            {open
-              ? "Close setup"
-              : provider.configured
-                ? "Update API key"
-                : "Connect API key"}
-          </button>
-          {provider.configured && (
+        <div className="integrationCardBar">
+          <div className="integrationActionGroup">
             <button
               type="button"
-              className="btn secondary"
+              className={"btn " + (open ? "secondary" : "primary")}
               disabled={!!busy}
-              onClick={handleTest}
+              onClick={() => {
+                setOpen((v) => !v);
+                setFeedback(null);
+              }}
             >
-              {busy === "test" ? "Testing…" : "Test connection"}
+              {open
+                ? "Cancel"
+                : provider.configured
+                  ? "Update API key"
+                  : "Connect API key"}
             </button>
-          )}
-          {provider.source === "workspace" && (
-            <button
-              type="button"
-              className="btn secondary"
-              disabled={!!busy}
-              onClick={handleDisconnect}
-            >
-              {busy === "disconnect" ? "Disconnecting…" : "Disconnect key"}
-            </button>
-          )}
+            {provider.configured && !open && (
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={!!busy}
+                onClick={handleTest}
+              >
+                {busy === "test" ? "Testing…" : "Test connection"}
+              </button>
+            )}
+            {provider.source === "workspace" && !open && (
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={!!busy}
+                onClick={handleDisconnect}
+              >
+                {busy === "disconnect" ? "Disconnecting…" : "Disconnect"}
+              </button>
+            )}
+          </div>
           {meta.helpUrl && (
             <a
               href={meta.helpUrl}
@@ -2872,42 +2874,55 @@ function ProviderCard({ provider, manage, request, onUpdated }) {
 
       {open && manage && (
         <form className="integrationConfigForm" onSubmit={handleSave}>
-          {meta.fields.map((field) => (
-            <label className="field" key={field.key}>
-              <span>{field.label}</span>
-              {field.type === "select" ? (
-                <select
-                  value={values[field.key] || field.options[0][0]}
-                  onChange={(e) =>
-                    setValues({ ...values, [field.key]: e.target.value })
-                  }
-                >
-                  {field.options.map(([val, label]) => (
-                    <option key={val} value={val}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type={field.type}
-                  required={field.required}
-                  placeholder={field.placeholder}
-                  autoComplete="off"
-                  value={values[field.key] || ""}
-                  onChange={(e) =>
-                    setValues({ ...values, [field.key]: e.target.value })
-                  }
-                />
-              )}
-            </label>
-          ))}
+          <div className="integrationFieldList">
+            {meta.fields.map((field) => (
+              <label className="field" key={field.key}>
+                <span>{field.label}</span>
+                {field.type === "select" ? (
+                  <select
+                    value={values[field.key] || field.options[0][0]}
+                    onChange={(e) =>
+                      setValues({ ...values, [field.key]: e.target.value })
+                    }
+                  >
+                    {field.options.map(([val, label]) => (
+                      <option key={val} value={val}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={field.type}
+                    required={field.required}
+                    placeholder={field.placeholder}
+                    autoComplete="off"
+                    value={values[field.key] || ""}
+                    onChange={(e) =>
+                      setValues({ ...values, [field.key]: e.target.value })
+                    }
+                  />
+                )}
+              </label>
+            ))}
+          </div>
           <div className="integrationFormFooter">
             <small>
-              Encrypted with AES-256-GCM on the server. Verified live against{" "}
+              Encrypted with AES-256-GCM on the server · Verified live against{" "}
               {meta.title} before saving.
             </small>
-            <div className="assetActions">
+            <div className="integrationFormButtons">
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={!!busy}
+                onClick={() => {
+                  setOpen(false);
+                  setFeedback(null);
+                }}
+              >
+                Cancel
+              </button>
               <button
                 type="button"
                 className="btn secondary"
