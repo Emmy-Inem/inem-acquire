@@ -2754,9 +2754,9 @@ function ProviderCard({ provider, manage, request, onUpdated }) {
   };
 
   return (
-    <article className="panel livePanel integrationCard">
+    <article className="panel livePanel integrationProviderCard">
       <div className="integrationCardTop">
-        <div>
+        <div className="integrationCardTitleWrap">
           <div className="integrationTitleRow">
             <h3>{provider.name}</h3>
             <span className="integrationCategoryBadge">{meta.badge}</span>
@@ -2816,55 +2816,53 @@ function ProviderCard({ provider, manage, request, onUpdated }) {
       )}
 
       {manage ? (
-        <div className="integrationCardBar">
-          <div className="integrationActionGroup">
-            <button
-              type="button"
-              className={"btn " + (open ? "secondary" : "primary")}
-              disabled={!!busy}
-              onClick={() => {
-                setOpen((v) => !v);
-                setFeedback(null);
-              }}
-            >
-              {open
-                ? "Cancel"
-                : provider.configured
-                  ? "Update API key"
-                  : "Connect API key"}
-            </button>
-            {provider.configured && !open && (
+        !open && (
+          <div className="integrationCardBar">
+            <div className="integrationActionGroup">
               <button
                 type="button"
-                className="btn secondary"
+                className="btn primary"
                 disabled={!!busy}
-                onClick={handleTest}
+                onClick={() => {
+                  setOpen(true);
+                  setFeedback(null);
+                }}
               >
-                {busy === "test" ? "Testing…" : "Test connection"}
+                {provider.configured ? "Update API key" : "Connect API key"}
               </button>
-            )}
-            {provider.source === "workspace" && !open && (
-              <button
-                type="button"
-                className="btn secondary"
-                disabled={!!busy}
-                onClick={handleDisconnect}
+              {provider.configured && (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  disabled={!!busy}
+                  onClick={handleTest}
+                >
+                  {busy === "test" ? "Testing…" : "Test connection"}
+                </button>
+              )}
+              {provider.source === "workspace" && (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  disabled={!!busy}
+                  onClick={handleDisconnect}
+                >
+                  {busy === "disconnect" ? "Disconnecting…" : "Disconnect"}
+                </button>
+              )}
+            </div>
+            {meta.helpUrl && (
+              <a
+                href={meta.helpUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="integrationHelpLink"
               >
-                {busy === "disconnect" ? "Disconnecting…" : "Disconnect"}
-              </button>
+                {meta.helpLabel} <ArrowRight size={13} />
+              </a>
             )}
           </div>
-          {meta.helpUrl && (
-            <a
-              href={meta.helpUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="integrationHelpLink"
-            >
-              {meta.helpLabel} <ArrowRight size={13} />
-            </a>
-          )}
-        </div>
+        )
       ) : (
         <small className="integrationViewerNote">
           Only organization owners and administrators can add or modify API
@@ -2874,6 +2872,19 @@ function ProviderCard({ provider, manage, request, onUpdated }) {
 
       {open && manage && (
         <form className="integrationConfigForm" onSubmit={handleSave}>
+          <div className="integrationFormHeader">
+            <strong>Configure {meta.title}</strong>
+            {meta.helpUrl && (
+              <a
+                href={meta.helpUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="integrationHelpLink"
+              >
+                {meta.helpLabel} <ArrowRight size={13} />
+              </a>
+            )}
+          </div>
           <div className="integrationFieldList">
             {meta.fields.map((field) => (
               <label className="field" key={field.key}>
@@ -3034,7 +3045,7 @@ function ConnectionsPage({ section, manage }) {
               )}
           </section>
         ) : (
-          <div className="integrationGrid">
+          <div className="integrationProvidersGrid">
             {data?.providers.map((p) => (
               <ProviderCard
                 key={p.provider}
