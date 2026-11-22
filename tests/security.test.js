@@ -40,7 +40,9 @@ test("resource schemas reject tenant, approval and ownership injection", () => {
 });
 test("protected APIs require a session", async () => {
   const app = createApp({ env });
-  const r = await request(app).get("/api/bootstrap");
+  const r = await request(app)
+    .get("/api/bootstrap")
+    .set("Cookie", "ac-access=invalid-token");
   assert.equal(r.status, 401);
   assert.match(r.headers["set-cookie"][0], /HttpOnly/);
 });

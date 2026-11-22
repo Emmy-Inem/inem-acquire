@@ -41,7 +41,12 @@ export function AuthProvider({ children }) {
     }
   }, []);
   useEffect(() => {
-    refresh().catch(() => {});
+    const hasCallbackTokens =
+      window.location.hash.includes("access_token=") ||
+      new URLSearchParams(window.location.search).has("token_hash");
+    if (!hasCallbackTokens) {
+      refresh().catch(() => {});
+    }
     return () => {
       sessionRequest.current += 1;
     };

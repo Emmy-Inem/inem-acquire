@@ -341,7 +341,7 @@ export function createApp({
     if (response.error) {
       const refresh = refreshToken;
       if (!refresh) {
-        clearSession(res);
+        if (token) clearSession(res);
         return res.status(401).json({ error: "Sign in to continue" });
       }
       const rotated = await makeClient().auth.refreshSession({
