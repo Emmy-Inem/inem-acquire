@@ -9,6 +9,7 @@ import {
   getUpcomingHolidays,
   lookupDomainRdap,
 } from "./free-intelligence.js";
+import { resolveOrganizationEnv } from "./organization-integrations.js";
 import { findOutsideCatalog } from "./extended-discovery.js";
 import { searchCatalog } from "./discovery-catalog.js";
 import express from "express";
@@ -240,13 +241,18 @@ export function extensionRoutes(
       const { plan } = z
         .object({ plan: z.enum(["starter", "growth"]) })
         .parse(req.body);
-      const price = env["STRIPE_PRICE_" + plan.toUpperCase()];
-      if (!env.STRIPE_SECRET_KEY || !price)
+      const orgEnv = await resolveOrganizationEnv(
+        env,
+        env.SUPABASE_SERVICE_ROLE_KEY ? admin() : null,
+        req.org,
+      );
+      const price = orgEnv["STRIPE_PRICE_" + plan.toUpperCase()];
+      if (!orgEnv.STRIPE_SECRET_KEY || !price)
         return res.status(503).json({
           error:
             "Subscription billing has not been configured. No charge has been made.",
         });
-      const stripe = new Stripe(env.STRIPE_SECRET_KEY);
+      const stripe = new Stripe(orgEnv.STRIPE_SECRET_KEY);
       const account = result(
         await req.db
           .from("billing_accounts")
@@ -293,7 +299,12 @@ export function extensionRoutes(
     auth,
     organization("manage"),
     wrap(async (req, res) => {
-      if (!env.STRIPE_SECRET_KEY)
+      const orgEnv = await resolveOrganizationEnv(
+        env,
+        env.SUPABASE_SERVICE_ROLE_KEY ? admin() : null,
+        req.org,
+      );
+      if (!orgEnv.STRIPE_SECRET_KEY)
         return res.status(503).json({ error: "Billing is not configured" });
       const account = result(
         await req.db
@@ -305,7 +316,7 @@ export function extensionRoutes(
       if (!account.customer_id)
         return res.status(400).json({ error: "No billing account exists yet" });
       const session = await new Stripe(
-        env.STRIPE_SECRET_KEY,
+        orgEnv.STRIPE_SECRET_KEY,
       ).billingPortal.sessions.create({
         customer: account.customer_id,
         return_url: origin + "/app/billing",
@@ -459,7 +470,12 @@ export function extensionRoutes(
           .json({
             error: "Choose an industry or enter a public business keyword.",
           });
-      res.json(await findOutsideCatalog(env, admin(), query));
+      const orgEnv = await resolveOrganizationEnv(
+        env,
+        env.SUPABASE_SERVICE_ROLE_KEY ? admin() : null,
+        req.org,
+      );
+      res.json(await findOutsideCatalog(orgEnv, admin(), query));
     }),
   );
   app.post(
@@ -521,7 +537,14 @@ export function extensionRoutes(
           });
       return researchLimit(req, res, (error) => {
         if (error) return next(error);
-        return wrap(async () => res.json(await findBusinesses(env, query)))(
+        return wrap(async () => {
+          const orgEnv = await resolveOrganizationEnv(
+            env,
+            env.SUPABASE_SERVICE_ROLE_KEY ? admin() : null,
+            req.org,
+          );
+          res.json(await findBusinesses(orgEnv, query));
+        })(
           req,
           res,
           next,
@@ -540,6 +563,11 @@ export function extensionRoutes(
         .strict()
         .parse(req.body);
       const db = admin();
+      const orgEnv = await resolveOrganizationEnv(
+        env,
+        env.SUPABASE_SERVICE_ROLE_KEY ? db : null,
+        req.org,
+      );
       const item = result(
         await db
           .from("discovery_catalog")
@@ -548,7 +576,7 @@ export function extensionRoutes(
           .maybeSingle(),
       );
       if (!item) return res.status(404).json({ error: "Business not found." });
-      if (!item.website && !env.GEMINI_API_KEY)
+      if (!item.website && !orgEnv.GEMINI_API_KEY)
         return res
           .status(503)
           .json({
@@ -556,7 +584,7 @@ export function extensionRoutes(
               "Website recovery is temporarily unavailable. Published contact details are still available.",
           });
       await reserve(req.org);
-      const outcome = await resolveBusinessWebsite(env, item);
+      const outcome = await resolveBusinessWebsite(orgEnv, item);
       const { contacts, websiteStatus: status, error } = outcome;
       const updated = result(
         await db.rpc("record_discovery_website_review", {
@@ -733,7 +761,12 @@ export function extensionRoutes(
           page: z.number().int().min(1).max(10).default(1),
         })
         .parse(req.body);
-      if (!env.APOLLO_API_KEY)
+      const orgEnv = await resolveOrganizationEnv(
+        env,
+        env.SUPABASE_SERVICE_ROLE_KEY ? admin() : null,
+        req.org,
+      );
+      if (!orgEnv.APOLLO_API_KEY)
         return res.status(503).json({
           error:
             "External prospect discovery is not configured. You can add researched companies or import CSV records.",
@@ -744,7 +777,7 @@ export function extensionRoutes(
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": env.APOLLO_API_KEY,
+            "x-api-key": orgEnv.APOLLO_API_KEY,
           },
           body: JSON.stringify({
             q_organization_keyword_tags: [query],

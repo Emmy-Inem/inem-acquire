@@ -5,6 +5,7 @@ import { api } from "./api";
 import { useAuth } from "./AuthContext";
 import { canRole } from "../../shared/permissions";
 import { uploadCompanyFile } from "./CompanyAssets";
+import { PageSkeleton } from "./Skeleton";
 export default function SalesAdvisor() {
   const { organization, workspaceBase } = useAuth(),
     label = useId(),
@@ -151,9 +152,10 @@ export default function SalesAdvisor() {
             </article>
           ))}
           {pending && (
-            <p className="liveState" role="status">
-              Reviewing your question and workspace evidence…
-            </p>
+            <PageSkeleton
+              variant="cards"
+              label="Reviewing your question and workspace evidence…"
+            />
           )}
         </section>
         <form

@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { api } from "./api";
+import { PageSkeleton } from "./Skeleton";
 const Context = createContext(null);
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null),
@@ -145,11 +146,7 @@ export function RequireAuth({ children }) {
   const { session, loading, error, refresh } = useAuth();
   const location = useLocation();
   if (loading)
-    return (
-      <div className="liveState" role="status">
-        Opening your workspace…
-      </div>
-    );
+    return <PageSkeleton variant="shell" label="Opening your workspace…" />;
   if (error)
     return (
       <div className="liveState" role="alert">

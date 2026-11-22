@@ -3,6 +3,15 @@ import { answerSalesQuestion } from "./sales-advisor.js";
 import { platformOrganizationRoutes } from "./platform-organizations.js";
 import { suggestedNextSteps } from "./gemini.js";
 import { webhookRoutes, extensionRoutes } from "./extensions.js";
+import {
+  decryptIntegrationPayload,
+  encryptIntegrationPayload,
+  listOrganizationIntegrations,
+  maskSecret,
+  parseProviderConfig,
+  resolveOrganizationEnv,
+  verifyProviderConnection,
+} from "./organization-integrations.js";
 import "dotenv/config";
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local", override: true, quiet: true });
@@ -628,12 +637,17 @@ export function createApp({
     auth,
     organization("write"),
     wrap(async (req, res) => {
+      const orgEnv = await resolveOrganizationEnv(
+        env,
+        env.SUPABASE_SERVICE_ROLE_KEY ? admin() : null,
+        req.org,
+      );
       const diagnosis = await edge(req, "sales-intelligence", {
         organization_id: req.org,
         action: "diagnose",
       });
       const steps = await suggestedNextSteps(
-        env,
+        orgEnv,
         diagnosis.data?.findings || [],
       );
       if (steps.length) {
@@ -656,7 +670,12 @@ export function createApp({
     organization("read"),
     wrap(async (req, res) => {
       const input = z.object({question:z.string().trim().min(3).max(2000),document_ids:z.array(z.string().uuid()).max(3).default([]),history:z.array(z.object({question:z.string().max(2000),answer:z.string().max(8000)}).strict()).max(4).default([])}).strict().parse(req.body);
-      res.json(await answerSalesQuestion(env, req.db, req.org, input));
+      const orgEnv = await resolveOrganizationEnv(
+        env,
+        env.SUPABASE_SERVICE_ROLE_KEY ? admin() : null,
+        req.org,
+      );
+      res.json(await answerSalesQuestion(orgEnv, req.db, req.org, input));
     }),
   );
   app.post(
@@ -676,14 +695,218 @@ export function createApp({
     "/api/campaigns/:id/send",
     auth,
     organization("approve"),
-    wrap(async (req, res) =>
+    wrap(async (req, res) => {
+      const id = uuid.parse(req.params.id);
+      const orgEnv = await resolveOrganizationEnv(
+        env,
+        env.SUPABASE_SERVICE_ROLE_KEY ? admin() : null,
+        req.org,
+      );
+      // If the organization connected its own Resend credentials and server default isn't set,
+      // deliver directly via the same guarded transaction logic.
+      if (
+        orgEnv.RESEND_API_KEY &&
+        orgEnv.OUTBOUND_FROM &&
+        (!env.RESEND_API_KEY || !env.OUTBOUND_FROM || orgEnv.RESEND_API_KEY !== env.RESEND_API_KEY)
+      ) {
+        const dbAdmin = admin();
+        const limit = result(
+          await dbAdmin.rpc("rate_limit_consume", {
+            bucket: `send:${req.org}`,
+            max_count: 5,
+            window_seconds: 3600,
+          }),
+        );
+        if (!limit)
+          return res
+            .status(429)
+            .json({ error: "Campaign sending limit reached. Try again later." });
+        const campaign = result(
+          await req.db
+            .from("campaigns")
+            .select("*")
+            .eq("organization_id", req.org)
+            .eq("id", id)
+            .single(),
+        );
+        if (campaign.status !== "approved" || !campaign.approved_by)
+          return res.status(409).json({
+            error: "A manager must approve this campaign before sending",
+          });
+        const recipients = result(
+          await req.db
+            .from("campaign_recipients")
+            .select("id,contact_id")
+            .eq("organization_id", req.org)
+            .eq("campaign_id", id)
+            .eq("status", "pending")
+            .limit(11),
+        );
+        if (!recipients.length)
+          return res
+            .status(400)
+            .json({ error: "Add recipients before sending" });
+        if (recipients.length > 10)
+          return res.status(400).json({
+            error: "Split this campaign into batches of at most 10 recipients",
+          });
+        const contacts = result(
+          await req.db
+            .from("contacts")
+            .select("id,email,full_name,consent_status")
+            .eq("organization_id", req.org)
+            .in(
+              "id",
+              recipients.map((r) => r.contact_id),
+            ),
+        );
+        if (
+          contacts.some((c) => c.consent_status !== "opted_in" || !c.email) ||
+          contacts.length !== recipients.length
+        )
+          return res.status(400).json({
+            error: "Every recipient must have an email and a recorded opt-in",
+          });
+        const claimed = result(
+          await dbAdmin
+            .from("campaigns")
+            .update({ status: "sending" })
+            .eq("organization_id", req.org)
+            .eq("id", id)
+            .eq("status", "approved")
+            .eq("updated_at", campaign.updated_at)
+            .select("id"),
+        );
+        if (!claimed.length)
+          return res.status(409).json({
+            error: "Campaign has changed or is already sending",
+          });
+        const job = result(
+          await dbAdmin
+            .from("jobs")
+            .insert({
+              organization_id: req.org,
+              type: "campaign.delivery",
+              status: "running",
+            })
+            .select("id")
+            .single(),
+        );
+        let sent = 0,
+          failed = 0;
+        for (const recipient of recipients) {
+          const contact = result(
+            await req.db
+              .from("contacts")
+              .select("id,email,consent_status")
+              .eq("organization_id", req.org)
+              .eq("id", recipient.contact_id)
+              .single(),
+          );
+          if (contact.consent_status !== "opted_in") {
+            failed++;
+            continue;
+          }
+          const claim = result(
+            await dbAdmin
+              .from("campaign_recipients")
+              .update({ status: "processing" })
+              .eq("organization_id", req.org)
+              .eq("id", recipient.id)
+              .eq("status", "pending")
+              .select("id"),
+          );
+          if (!claim.length) continue;
+          try {
+            const response = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${orgEnv.RESEND_API_KEY}`,
+                "Content-Type": "application/json",
+                "Idempotency-Key": `acquire-${recipient.id}`,
+              },
+              body: JSON.stringify({
+                from: orgEnv.OUTBOUND_FROM,
+                to: [contact.email],
+                subject: campaign.subject,
+                ...(orgEnv.INBOUND_DOMAIN
+                  ? { reply_to: `reply+${req.org}@${orgEnv.INBOUND_DOMAIN}` }
+                  : {}),
+                text:
+                  campaign.body +
+                  "\n\nTo stop receiving these messages, reply with unsubscribe.",
+              }),
+              signal: AbortSignal.timeout(15000),
+            });
+            const delivery = await response.json();
+            if (!response.ok) throw new Error("Email provider rejected delivery");
+            result(
+              await dbAdmin
+                .from("campaign_recipients")
+                .update({ status: "sent", provider_id: delivery.id })
+                .eq("id", recipient.id)
+                .eq("organization_id", req.org),
+            );
+            result(
+              await dbAdmin.from("messages").insert({
+                organization_id: req.org,
+                contact_id: contact.id,
+                campaign_id: id,
+                direction: "outbound",
+                subject: campaign.subject,
+                body: campaign.body,
+                provider_id: delivery.id,
+              }),
+            );
+            sent++;
+          } catch {
+            failed++;
+            await dbAdmin
+              .from("campaign_recipients")
+              .update({
+                status: "failed",
+                last_error:
+                  "Delivery could not be confirmed. Review the provider before retrying.",
+              })
+              .eq("id", recipient.id)
+              .eq("organization_id", req.org);
+          }
+        }
+        result(
+          await dbAdmin
+            .from("campaigns")
+            .update({ status: failed ? "failed" : "sent" })
+            .eq("id", id)
+            .eq("organization_id", req.org),
+        );
+        result(
+          await dbAdmin
+            .from("jobs")
+            .update({
+              status: failed ? "failed" : "complete",
+              result: { sent, failed },
+            })
+            .eq("id", job.id),
+        );
+        result(
+          await dbAdmin.from("audit_events").insert({
+            organization_id: req.org,
+            actor_id: req.user.id,
+            action: "campaign.sent",
+            entity_type: "campaigns",
+            entity_id: id,
+            details: { sent, failed },
+          }),
+        );
+        return res.json({ sent, failed, job_id: job.id });
+      }
       res.json(
         await edge(req, "campaign-delivery", {
           organization_id: req.org,
-          campaign_id: uuid.parse(req.params.id),
+          campaign_id: id,
         }),
-      ),
-    ),
+      );
+    }),
   );
   app.get(
     "/api/team",
@@ -822,34 +1045,139 @@ export function createApp({
       res.json({ success: true });
     }),
   );
-  app.get("/api/integrations", auth, organization("read"), (_req, res) =>
-    res.json({
-      providers: [
-        {
-          name: "Gemini assistance",
-          provider: "gemini",
-          configured: !!env.GEMINI_API_KEY,
-        },
-        {
-          name: "Email delivery",
-          provider: "resend",
-          configured: !!(env.RESEND_API_KEY && env.OUTBOUND_FROM),
-        },
-        {
-          name: "Prospect enrichment",
-          provider: "apollo",
-          configured: !!env.APOLLO_API_KEY,
-        },
-        {
-          name: "Subscription billing",
-          provider: "stripe",
-          configured: !!(
-            env.STRIPE_SECRET_KEY &&
-            env.STRIPE_PRICE_STARTER &&
-            env.STRIPE_PRICE_GROWTH
-          ),
-        },
-      ],
+  app.get(
+    "/api/integrations",
+    auth,
+    organization("read"),
+    wrap(async (req, res) =>
+      res.json({
+        providers: await listOrganizationIntegrations(
+          env,
+          env.SUPABASE_SERVICE_ROLE_KEY ? admin() : null,
+          req.org,
+        ),
+      }),
+    ),
+  );
+  app.post(
+    "/api/integrations/:provider",
+    auth,
+    organization("manage"),
+    wrap(async (req, res) => {
+      if (req.supportId)
+        return res.status(403).json({
+          error:
+            "Organization integration credentials cannot be modified during a support session.",
+        });
+      const provider = z
+        .enum(["gemini", "resend", "apollo", "stripe"])
+        .parse(req.params.provider);
+      const config = parseProviderConfig(provider, req.body);
+      const verification = await verifyProviderConnection(provider, config);
+      const encrypted = encryptIntegrationPayload(env, req.org, config);
+      const metadata =
+        provider === "gemini"
+          ? { model: config.model }
+          : provider === "resend"
+            ? {
+                outboundFrom: config.outboundFrom,
+                inboundDomain: config.inboundDomain || "",
+              }
+            : provider === "stripe"
+              ? {
+                  priceStarter: config.priceStarter || "",
+                  priceGrowth: config.priceGrowth || "",
+                }
+              : {};
+      result(
+        await admin().rpc("save_organization_integration_secret", {
+          target_org: req.org,
+          provider_name: provider,
+          secret_ciphertext: encrypted.ciphertext,
+          secret_iv: encrypted.iv,
+          secret_tag: encrypted.authTag,
+          masked_hint: maskSecret(config.apiKey),
+          public_metadata: metadata,
+          actor_id: req.user.id,
+        }),
+      );
+      res.json({
+        success: true,
+        provider,
+        verified: verification.verified,
+        detail: verification.detail,
+        keyHint: maskSecret(config.apiKey),
+        metadata,
+      });
+    }),
+  );
+  app.post(
+    "/api/integrations/:provider/test",
+    auth,
+    organization("manage"),
+    wrap(async (req, res) => {
+      const provider = z
+        .enum(["gemini", "resend", "apollo", "stripe"])
+        .parse(req.params.provider);
+      let config = null;
+      if (req.body && typeof req.body.apiKey === "string" && req.body.apiKey.trim()) {
+        config = parseProviderConfig(provider, req.body);
+      } else {
+        const rows = result(
+          await admin().rpc("get_organization_integration_secrets", {
+            target_org: req.org,
+          }),
+        );
+        const saved = (Array.isArray(rows) ? rows : []).find(
+          (r) => r.provider === provider,
+        );
+        if (saved) {
+          config = decryptIntegrationPayload(env, req.org, saved);
+        } else if (provider === "gemini" && env.GEMINI_API_KEY) {
+          config = {
+            apiKey: env.GEMINI_API_KEY,
+            model: env.GEMINI_MODEL || "gemini-3.1-flash-lite",
+          };
+        } else if (provider === "resend" && env.RESEND_API_KEY) {
+          config = {
+            apiKey: env.RESEND_API_KEY,
+            outboundFrom: env.OUTBOUND_FROM || "",
+          };
+        } else if (provider === "apollo" && env.APOLLO_API_KEY) {
+          config = { apiKey: env.APOLLO_API_KEY };
+        } else if (provider === "stripe" && env.STRIPE_SECRET_KEY) {
+          config = { apiKey: env.STRIPE_SECRET_KEY };
+        }
+      }
+      if (!config || !config.apiKey)
+        return res.status(400).json({
+          error: "Enter an API key or connect this integration before testing.",
+        });
+      const verification = await verifyProviderConnection(provider, config);
+      res.json(verification);
+    }),
+  );
+  app.delete(
+    "/api/integrations/:provider",
+    auth,
+    organization("manage"),
+    wrap(async (req, res) => {
+      if (req.supportId)
+        return res.status(403).json({
+          error:
+            "Organization integration credentials cannot be removed during a support session.",
+        });
+      const provider = z
+        .enum(["gemini", "resend", "apollo", "stripe"])
+        .parse(req.params.provider);
+      result(
+        await admin().rpc("delete_organization_integration_secret", {
+          target_org: req.org,
+          provider_name: provider,
+          actor_id: req.user.id,
+        }),
+      );
+      res.json({ success: true, provider });
     }),
   );
   app.post(

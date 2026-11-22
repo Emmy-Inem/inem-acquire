@@ -17,6 +17,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { industries } from "../../shared/research";
 import { api } from "./api";
 import { useAuth } from "./AuthContext";
+import { PageSkeleton } from "./Skeleton";
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
@@ -1005,6 +1006,8 @@ export default function ProspectResearch({ onSaved }) {
                 </tbody>
               </table>
             </div>
+          ) : phase === "searching" ? (
+            <PageSkeleton variant="table" label="Looking for companies…" />
           ) : !phase ? (
             <p className="leadEmpty">
               No matching contacts. Try another search or research a company

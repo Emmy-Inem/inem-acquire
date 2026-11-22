@@ -1,4 +1,5 @@
 import CatalogMaintenance from "./CatalogMaintenance";
+import { PageSkeleton } from "./Skeleton";
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Navigate, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Building2, ChevronLeft, ChevronRight, ClipboardList, Headset, Inbox, LogOut, Plus, Search, ShieldCheck, X } from "lucide-react";
@@ -38,13 +39,15 @@ function useConsoleData(path, revision = 0) {
   return { ...(current ? response : { loading: true }), reload: () => setAttempt((value) => value + 1) };
 }
 
-function ConsoleState({ resource, pending }) {
+function ConsoleState({ resource, pending, variant = "table" }) {
   return resource.error ? (
     <div className="consoleFeedback" role="alert">
       <p>{resource.error}</p>
       <button type="button" className="btn secondary" onClick={resource.reload}>Try again</button>
     </div>
-  ) : resource.loading ? <p className="consoleFeedback" role="status">{pending}</p> : null;
+  ) : resource.loading ? (
+    <PageSkeleton variant={variant} label={pending || "Loading…"} />
+  ) : null;
 }
 
 function StatusText({ status }) {

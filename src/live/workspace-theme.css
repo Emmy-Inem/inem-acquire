@@ -1476,3 +1476,316 @@
 .appShell .advisorTurn {
   scroll-margin-top: 84px;
 }
+
+/* Self-Serve Integrations & API Keys */
+.appShell .integrationGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-block: 16px;
+}
+.appShell .integrationCard {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.appShell .integrationCardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+.appShell .integrationTitleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.appShell .integrationTitleRow h3 {
+  font-size: 16px;
+  font-weight: 750;
+  margin: 0;
+  color: var(--work-ink);
+}
+.appShell .integrationCategoryBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f0f4fb;
+  color: #455a7c;
+  border: 1px solid #dce5f4;
+}
+.appShell .integrationCardTop p {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--work-muted);
+  margin: 0;
+}
+.appShell .integrationStatusPill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.appShell .integrationStatusPill.connected {
+  background: #e8f7ef;
+  color: #166844;
+  border: 1px solid #bfe7d1;
+}
+.appShell .integrationStatusPill.disconnected {
+  background: #f4f6fa;
+  color: #637087;
+  border: 1px solid #e1e6ef;
+}
+.appShell .integrationKeyMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fafbfe;
+  border: 1px solid var(--work-line);
+  border-radius: 8px;
+  font-size: 11.5px;
+  color: #4d5d75;
+}
+.appShell .integrationKeyMeta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: #eef3fb;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #17263c;
+}
+.appShell .integrationCardActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+.appShell .integrationCardActions .btn {
+  margin-top: 0;
+}
+.appShell .integrationHelpLink {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--work-accent);
+  min-height: 36px;
+}
+.appShell .integrationViewerNote {
+  color: var(--work-muted);
+  font-size: 11.5px;
+}
+.appShell .integrationConfigForm {
+  border-top: 1px solid var(--work-line);
+  padding-top: 14px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.appShell .integrationFormFooter {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+.appShell .integrationFormFooter small {
+  color: var(--work-muted);
+  font-size: 11px;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* Shimmer Skeleton Loaders Across All Pages */
+@keyframes acquireSkeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.skeletonSurface {
+  width: 100%;
+  padding: 8px 0;
+}
+.skeletonBar {
+  display: block;
+  height: 13px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    #edf1f7 25%,
+    #e0e7f2 50%,
+    #edf1f7 75%
+  );
+  background-size: 200% 100%;
+  animation: acquireSkeletonShimmer 1.5s ease-in-out infinite;
+}
+.skeletonBar.title {
+  width: 240px;
+  height: 26px;
+  margin-bottom: 10px;
+}
+.skeletonBar.heading {
+  width: 42%;
+  height: 18px;
+  margin-bottom: 14px;
+}
+.skeletonBar.metric {
+  width: 55%;
+  height: 28px;
+  margin-top: 10px;
+}
+.skeletonBar.long {
+  width: 92%;
+  margin-bottom: 10px;
+}
+.skeletonBar.medium {
+  width: 64%;
+}
+.skeletonBar.short {
+  width: 34%;
+}
+.skeletonBar.badge {
+  width: 82px;
+  height: 20px;
+  border-radius: 999px;
+}
+.skeletonBar.pill {
+  width: 52px;
+  height: 22px;
+  border-radius: 6px;
+}
+.skeletonBar.input {
+  width: 100%;
+  height: 34px;
+  margin-top: 10px;
+}
+.skeletonShell {
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 28px;
+}
+.skeletonHeader {
+  margin-bottom: 22px;
+}
+.skeletonStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.skeletonStatCard {
+  padding: 18px 20px;
+  border: 1px solid #e1e6ef;
+  border-radius: 10px;
+  background: #fff;
+}
+.skeletonPanel {
+  padding: 22px;
+}
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid #eef2f8;
+}
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+.skeletonCards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-block: 12px;
+}
+.skeletonCardItem {
+  margin: 0 !important;
+  padding: 22px;
+}
+.skeletonCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.skeletonCardHeader .skeletonBar.heading {
+  margin-bottom: 0;
+}
+.skeletonTable {
+  width: 100%;
+  padding: 8px 16px;
+}
+.skeletonTableHead,
+.skeletonTableRow {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1fr 1fr 0.8fr;
+  gap: 16px;
+  align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid #eef2f8;
+}
+.skeletonTableHead {
+  border-bottom-color: #dce3ef;
+}
+.skeletonKanbanCol {
+  padding: 14px;
+  background: #fafbfe;
+  border: 1px solid #e1e6ef;
+  border-radius: 10px;
+}
+.skeletonKanbanCard {
+  padding: 14px;
+  margin-top: 10px;
+  background: #fff;
+  border: 1px solid #e1e6ef;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skeletonStack {
+  padding: 14px 16px;
+  border-bottom: 1px solid #eef2f8;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+@media (max-width: 920px) {
+  .appShell .integrationGrid,
+  .skeletonCards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .skeletonStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .skeletonTableHead,
+  .skeletonTableRow {
+    grid-template-columns: 1.6fr 1fr 0.8fr;
+  }
+  .skeletonTableHead > :nth-child(n + 4),
+  .skeletonTableRow > :nth-child(n + 4) {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBar {
+    animation: none;
+  }
+}

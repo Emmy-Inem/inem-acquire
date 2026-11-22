@@ -48,6 +48,7 @@ import AccountSettings from "./AccountSettings";
 import WorkspaceGuide from "./WorkspaceGuide";
 import { toLocalDateTime } from "./dateTime";
 import { assignableRoles, canManageMember } from "../../shared/permissions";
+import { PageSkeleton } from "./Skeleton";
 
 const SalesAdvisor = React.lazy(() => import("./SalesAdvisor"));
 const ProspectResearch = React.lazy(() => import("./ProspectResearch"));
@@ -268,13 +269,9 @@ function useOrgApi() {
     [organization?.id, organization?.support?.id],
   );
 }
-function State({ loading, error, retry, empty, children }) {
+function State({ loading, error, retry, empty, variant = "table", children }) {
   if (loading)
-    return (
-      <div className="liveState" role="status">
-        Loading your records…
-      </div>
-    );
+    return <PageSkeleton variant={variant} label="Loading your records…" />;
   if (error)
     return (
       <div className="liveState liveError" role="alert">
@@ -577,9 +574,7 @@ export function LiveWorkspace() {
           ) : section === "ai-advisor" ? (
             <React.Suspense
               fallback={
-                <p className="liveState" role="status">
-                  Opening Sales advisor…
-                </p>
+                <PageSkeleton variant="cards" label="Opening Sales advisor…" />
               }
             >
               <SalesAdvisor />
@@ -1076,9 +1071,7 @@ function ResourcePage({ resource, write, approve }) {
           <div hidden={showRecords}>
             <React.Suspense
               fallback={
-                <p className="liveState" role="status">
-                  Opening Discovery…
-                </p>
+                <PageSkeleton variant="table" label="Opening Discovery…" />
               }
             >
               <ProspectResearch onSaved={load} />
@@ -1696,7 +1689,12 @@ function Overview({ analytics, write }) {
           Ask advisor
         </Link>
       </Header>
-      <State loading={!data && !error} error={error} retry={load}>
+      <State
+        loading={!data && !error}
+        error={error}
+        retry={load}
+        variant="dashboard"
+      >
         {currencies.length > 1 && (
           <p className="liveNotice">
             {market?.exchange?.provider && market.exchange.provider !== "offline"
@@ -1844,7 +1842,12 @@ function PipelinePage({ write }) {
           Manage deals
         </Link>
       </Header>
-      <State loading={!rows && !error} error={error} retry={load}>
+      <State
+        loading={!rows && !error}
+        error={error}
+        retry={load}
+        variant="pipeline"
+      >
         <section
           className="kanban liveKanban"
           role="region"
@@ -1966,6 +1969,7 @@ function DiagnosisPage({ write }) {
         loading={!rows && !error}
         error={error}
         retry={load}
+        variant="cards"
         empty={
           !rows?.length
             ? "Add company context and sales records, then run your first diagnosis."
@@ -2143,7 +2147,7 @@ function TasksPage({ write, approve }) {
           {error}
         </p>
       )}
-      <State loading={loading} error={error} retry={load}>
+      <State loading={loading} error={error} retry={load} variant="cards">
         {shown.length ? (
           <div className="taskBoard">
             {shown.map((task) => {
@@ -2402,7 +2406,12 @@ function TeamPage({ manage }) {
         title="Team & roles"
         description="Keep organization permissions separate from platform ownership."
       />
-      <State loading={!data && !error} error={error} retry={load}>
+      <State
+        loading={!data && !error}
+        error={error}
+        retry={load}
+        variant="dashboard"
+      >
         <section className="panel livePanel">
           {data?.members.map((m) => (
             <div className="liveMetric" key={m.user_id}>
@@ -2542,6 +2551,386 @@ function TeamPage({ manage }) {
     </>
   );
 }
+const providerMeta = {
+  gemini: {
+    title: "Google Gemini AI",
+    badge: "AI & Search Grounding",
+    description:
+      "Powers Sales Advisor answers, public industry ranking, and AI website recovery.",
+    helpUrl: "https://aistudio.google.com/api-keys",
+    helpLabel: "Get a free Gemini key in Google AI Studio",
+    fields: [
+      {
+        key: "apiKey",
+        label: "Gemini API key",
+        type: "password",
+        placeholder: "AIzaSy...",
+        required: true,
+      },
+      {
+        key: "model",
+        label: "Model",
+        type: "select",
+        options: [
+          ["gemini-3.1-flash-lite", "gemini-3.1-flash-lite (Fast & default)"],
+          ["gemini-2.5-flash", "gemini-2.5-flash"],
+          ["gemini-2.5-pro", "gemini-2.5-pro"],
+        ],
+      },
+    ],
+  },
+  resend: {
+    title: "Resend Email Delivery",
+    badge: "Outbound Campaigns & Replies",
+    description:
+      "Delivers manager-approved email campaigns to opted-in contacts using your verified sender domain.",
+    helpUrl: "https://resend.com/api-keys",
+    helpLabel: "Create a Resend API key",
+    fields: [
+      {
+        key: "apiKey",
+        label: "Resend API key",
+        type: "password",
+        placeholder: "re_...",
+        required: true,
+      },
+      {
+        key: "outboundFrom",
+        label: "Verified sender address",
+        type: "text",
+        placeholder: "Inem Acquire <team@yourdomain.com>",
+        required: true,
+      },
+      {
+        key: "inboundDomain",
+        label: "Inbound reply domain (optional)",
+        type: "text",
+        placeholder: "reply.yourdomain.com",
+        required: false,
+      },
+    ],
+  },
+  apollo: {
+    title: "Apollo.io Prospect Search",
+    badge: "External B2B Directory",
+    description:
+      "Expands prospect discovery with Apollo’s global B2B company database.",
+    helpUrl: "https://app.apollo.io/#/settings/integrations/api",
+    helpLabel: "Open Apollo API settings",
+    fields: [
+      {
+        key: "apiKey",
+        label: "Apollo API key",
+        type: "password",
+        placeholder: "Enter your Apollo API key",
+        required: true,
+      },
+    ],
+  },
+  stripe: {
+    title: "Stripe Subscription Billing",
+    badge: "Customer Checkout & Portal",
+    description:
+      "Enables self-serve Starter and Growth plan checkout and the customer billing portal.",
+    helpUrl: "https://dashboard.stripe.com/apikeys",
+    helpLabel: "Open Stripe API keys dashboard",
+    fields: [
+      {
+        key: "apiKey",
+        label: "Stripe Secret Key",
+        type: "password",
+        placeholder: "sk_live_... or sk_test_...",
+        required: true,
+      },
+      {
+        key: "priceStarter",
+        label: "Starter Plan Price ID (optional)",
+        type: "text",
+        placeholder: "price_...",
+        required: false,
+      },
+      {
+        key: "priceGrowth",
+        label: "Growth Plan Price ID (optional)",
+        type: "text",
+        placeholder: "price_...",
+        required: false,
+      },
+    ],
+  },
+};
+
+function ProviderCard({ provider, manage, request, onUpdated }) {
+  const meta = providerMeta[provider.provider] || {
+    title: provider.name,
+    badge: "Integration",
+    description: "",
+    fields: [
+      {
+        key: "apiKey",
+        label: "API Key",
+        type: "password",
+        required: true,
+      },
+    ],
+  };
+  const [open, setOpen] = useState(false);
+  const [values, setValues] = useState(() => ({
+    apiKey: "",
+    model: provider.metadata?.model || "gemini-3.1-flash-lite",
+    outboundFrom: provider.metadata?.outboundFrom || "",
+    inboundDomain: provider.metadata?.inboundDomain || "",
+    priceStarter: provider.metadata?.priceStarter || "",
+    priceGrowth: provider.metadata?.priceGrowth || "",
+  }));
+  const [busy, setBusy] = useState("");
+  const [feedback, setFeedback] = useState(null);
+
+  const handleTest = async () => {
+    setBusy("test");
+    setFeedback(null);
+    try {
+      const payload = values.apiKey.trim() ? values : {};
+      const res = await request(
+        `/integrations/${provider.provider}/test`,
+        {
+          method: "POST",
+          body: payload,
+        },
+      );
+      setFeedback({
+        type: "success",
+        text: res.detail || "Connection verified with provider.",
+      });
+    } catch (e) {
+      setFeedback({ type: "error", text: e.message });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setBusy("save");
+    setFeedback(null);
+    try {
+      const res = await request(`/integrations/${provider.provider}`, {
+        method: "POST",
+        body: values,
+      });
+      setValues((prev) => ({ ...prev, apiKey: "" }));
+      setOpen(false);
+      setFeedback({
+        type: "success",
+        text: res.detail || `${meta.title} connected and verified.`,
+      });
+      await onUpdated();
+    } catch (e) {
+      setFeedback({ type: "error", text: e.message });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setBusy("disconnect");
+    setFeedback(null);
+    try {
+      await request(`/integrations/${provider.provider}`, {
+        method: "DELETE",
+        body: {},
+      });
+      setOpen(false);
+      setFeedback({
+        type: "success",
+        text: "Workspace API key disconnected.",
+      });
+      await onUpdated();
+    } catch (e) {
+      setFeedback({ type: "error", text: e.message });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  return (
+    <article className="panel livePanel integrationCard">
+      <div className="integrationCardTop">
+        <div>
+          <div className="integrationTitleRow">
+            <h3>{provider.name}</h3>
+            <span className="integrationCategoryBadge">{meta.badge}</span>
+          </div>
+          <p>{meta.description}</p>
+        </div>
+        <span
+          className={
+            "integrationStatusPill " +
+            (provider.configured ? "connected" : "disconnected")
+          }
+        >
+          {provider.configured
+            ? provider.source === "workspace"
+              ? "Workspace key active"
+              : provider.provider === "gemini"
+                ? "Key configured"
+                : "Available"
+            : "Not connected"}
+        </span>
+      </div>
+
+      {(provider.keyHint ||
+        provider.metadata?.outboundFrom ||
+        provider.metadata?.model) && (
+        <div className="integrationKeyMeta">
+          {provider.keyHint && (
+            <span>
+              Saved key: <code>{provider.keyHint}</code>
+            </span>
+          )}
+          {provider.metadata?.model && (
+            <span>
+              Model: <code>{provider.metadata.model}</code>
+            </span>
+          )}
+          {provider.metadata?.outboundFrom && (
+            <span>
+              Sender: <code>{provider.metadata.outboundFrom}</code>
+            </span>
+          )}
+          {provider.updatedAt && (
+            <span>
+              Updated {new Date(provider.updatedAt).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+      )}
+
+      {feedback && (
+        <p
+          className={feedback.type === "error" ? "liveError" : "liveNotice"}
+          role={feedback.type === "error" ? "alert" : "status"}
+        >
+          {feedback.text}
+        </p>
+      )}
+
+      {manage ? (
+        <div className="integrationCardActions">
+          <button
+            type="button"
+            className="btn primary"
+            disabled={!!busy}
+            onClick={() => {
+              setOpen((v) => !v);
+              setFeedback(null);
+            }}
+          >
+            {open
+              ? "Close setup"
+              : provider.configured
+                ? "Update API key"
+                : "Connect API key"}
+          </button>
+          {provider.configured && (
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={!!busy}
+              onClick={handleTest}
+            >
+              {busy === "test" ? "Testing…" : "Test connection"}
+            </button>
+          )}
+          {provider.source === "workspace" && (
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={!!busy}
+              onClick={handleDisconnect}
+            >
+              {busy === "disconnect" ? "Disconnecting…" : "Disconnect key"}
+            </button>
+          )}
+          {meta.helpUrl && (
+            <a
+              href={meta.helpUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="integrationHelpLink"
+            >
+              {meta.helpLabel} <ArrowRight size={13} />
+            </a>
+          )}
+        </div>
+      ) : (
+        <small className="integrationViewerNote">
+          Only organization owners and administrators can add or modify API
+          keys.
+        </small>
+      )}
+
+      {open && manage && (
+        <form className="integrationConfigForm" onSubmit={handleSave}>
+          {meta.fields.map((field) => (
+            <label className="field" key={field.key}>
+              <span>{field.label}</span>
+              {field.type === "select" ? (
+                <select
+                  value={values[field.key] || field.options[0][0]}
+                  onChange={(e) =>
+                    setValues({ ...values, [field.key]: e.target.value })
+                  }
+                >
+                  {field.options.map(([val, label]) => (
+                    <option key={val} value={val}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={field.type}
+                  required={field.required}
+                  placeholder={field.placeholder}
+                  autoComplete="off"
+                  value={values[field.key] || ""}
+                  onChange={(e) =>
+                    setValues({ ...values, [field.key]: e.target.value })
+                  }
+                />
+              )}
+            </label>
+          ))}
+          <div className="integrationFormFooter">
+            <small>
+              Encrypted with AES-256-GCM on the server. Verified live against{" "}
+              {meta.title} before saving.
+            </small>
+            <div className="assetActions">
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={!!busy || !values.apiKey.trim()}
+                onClick={handleTest}
+              >
+                {busy === "test" ? "Verifying…" : "Verify key"}
+              </button>
+              <button
+                type="submit"
+                className="btn primary"
+                disabled={!!busy || !values.apiKey.trim()}
+              >
+                {busy === "save" ? "Connecting…" : "Verify & save key"}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+    </article>
+  );
+}
+
 function ConnectionsPage({ section, manage }) {
   const request = useOrgApi(),
     [data, setData] = useState(null),
@@ -2572,91 +2961,76 @@ function ConnectionsPage({ section, manage }) {
         description={
           section === "billing"
             ? "Your recorded subscription and billing status."
-            : "Connection status is checked on the server. Credentials are never shown in the browser."
+            : "Connect, verify, and manage your workspace API keys anytime. Keys are encrypted at rest and never exposed to the browser."
         }
       />
-      <State loading={!data && !error} error={error} retry={load}>
-        <section className="panel livePanel">
-          {section === "billing" ? (
-            <>
-              <h2>{titleCase(data?.accounts?.[0]?.plan || "Starter")}</h2>
-              <p>
-                <strong>{data?.usage?.remaining ?? "—"}</strong> of{" "}
-                {data?.usage?.limit ?? "—"} research credits remaining this
-                month.
-              </p>
-              <p>
-                One credit researches one business website. Browsing the shared
-                catalog is free of research charges. Credits reset each calendar
-                month.
-              </p>
-              <p>
-                Status:{" "}
-                {titleCase(data?.accounts?.[0]?.status || "Not configured")}
-              </p>
-              <p>
-                {data?.providers.find((p) => p.provider === "stripe")
-                  ?.configured
-                  ? "Manage your subscription securely with Stripe."
-                  : "Online billing is not connected yet. Your workspace records are available; no payment will be taken here."}
-              </p>
-              {manage &&
-                data?.providers.find((p) => p.provider === "stripe")
-                  ?.configured && (
-                  <button
-                    className="btn primary"
-                    onClick={async () => {
-                      try {
-                        const existing = !!data?.accounts?.[0]?.customer_id;
-                        const r = await request(
-                          existing ? "/billing/portal" : "/billing/checkout",
-                          {
-                            method: "POST",
-                            body: existing ? {} : { plan: "growth" },
-                          },
-                        );
-                        window.location.assign(r.url);
-                      } catch (e) {
-                        setError(e.message);
-                      }
-                    }}
-                  >
-                    {data?.accounts?.[0]?.customer_id
-                      ? "Manage subscription"
-                      : "Upgrade to Growth"}
-                  </button>
-                )}
-            </>
-          ) : (
-            data?.providers.map((p) => (
-              <div className="liveMetric" key={p.provider}>
-                <span>
-                  <b>{p.name}</b>
-                  <small>
-                    {p.provider === "gemini"
-                      ? p.configured
-                        ? "AI assistance is connected for public business research, website recovery and workspace advice. Only files you attach are included in an advisor answer."
-                        : "Add a Gemini API key to enable prospect ranking and sales suggestions."
-                      : p.configured
-                        ? "Connected and available to your workspace"
-                        : p.provider === "apollo"
-                          ? "Connect Apollo to search for new companies. Manual records and CSV import work now."
-                          : p.provider === "resend"
-                            ? "Campaign delivery needs a verified sender. This is separate from account verification emails."
-                            : "Connect Stripe to activate online subscriptions."}
-                  </small>
-                </span>
-                <strong>
-                  {p.configured
-                    ? p.provider === "gemini"
-                      ? "Key configured"
-                      : "Available"
-                    : "Not connected"}
-                </strong>
-              </div>
-            ))
-          )}
-        </section>
+      <State
+        loading={!data && !error}
+        error={error}
+        retry={load}
+        variant={section === "billing" ? "dashboard" : "cards"}
+      >
+        {section === "billing" ? (
+          <section className="panel livePanel">
+            <h2>{titleCase(data?.accounts?.[0]?.plan || "Starter")}</h2>
+            <p>
+              <strong>{data?.usage?.remaining ?? "—"}</strong> of{" "}
+              {data?.usage?.limit ?? "—"} research credits remaining this month.
+            </p>
+            <p>
+              One credit researches one business website. Browsing the shared
+              catalog is free of research charges. Credits reset each calendar
+              month.
+            </p>
+            <p>
+              Status:{" "}
+              {titleCase(data?.accounts?.[0]?.status || "Not configured")}
+            </p>
+            <p>
+              {data?.providers.find((p) => p.provider === "stripe")?.configured
+                ? "Manage your subscription securely with Stripe."
+                : "Online billing is not connected yet. Your workspace records are available; no payment will be taken here."}
+            </p>
+            {manage &&
+              data?.providers.find((p) => p.provider === "stripe")
+                ?.configured && (
+                <button
+                  className="btn primary"
+                  onClick={async () => {
+                    try {
+                      const existing = !!data?.accounts?.[0]?.customer_id;
+                      const r = await request(
+                        existing ? "/billing/portal" : "/billing/checkout",
+                        {
+                          method: "POST",
+                          body: existing ? {} : { plan: "growth" },
+                        },
+                      );
+                      window.location.assign(r.url);
+                    } catch (e) {
+                      setError(e.message);
+                    }
+                  }}
+                >
+                  {data?.accounts?.[0]?.customer_id
+                    ? "Manage subscription"
+                    : "Upgrade to Growth"}
+                </button>
+              )}
+          </section>
+        ) : (
+          <div className="integrationGrid">
+            {data?.providers.map((p) => (
+              <ProviderCard
+                key={p.provider}
+                provider={p}
+                manage={manage}
+                request={request}
+                onUpdated={load}
+              />
+            ))}
+          </div>
+        )}
         {section === "integrations" && (
           <section className="panel livePanel">
             <h2>Active free public intelligence APIs (no key required)</h2>
@@ -2736,6 +3110,7 @@ function InboxView() {
         loading={!rows && !error}
         error={error}
         retry={load}
+        variant="inbox"
         empty={
           !rows?.length
             ? "No messages yet. Approved campaign deliveries and connected incoming email will appear here."

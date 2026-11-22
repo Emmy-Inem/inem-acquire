@@ -56,6 +56,9 @@ test("restricted organization roles are denied before mutation, export or provid
     ["post", "/api/invitations", "manage"],
     ["patch", "/api/organization", "manage"],
     ["get", "/api/integrations", "read"],
+    ["post", "/api/integrations/gemini", "manage"],
+    ["post", "/api/integrations/gemini/test", "manage"],
+    ["delete", "/api/integrations/gemini", "manage"],
     ["post", "/api/billing/checkout", "manage"],
     ["post", "/api/billing/portal", "manage"],
   ];
@@ -125,6 +128,92 @@ test("all organization readers can inspect integration availability without rece
     assert.equal(response.status, 200, role);
     assert.equal(response.body.providers.find(provider => provider.provider === "resend").configured, true);
     assert.equal(JSON.stringify(response.body).includes("private-test-secret"), false);
-    assert.ok(response.body.providers.every(provider => Object.keys(provider).every(key => ["name", "provider", "configured"].includes(key))));
+    assert.ok(response.body.providers.every(provider => Object.keys(provider).every(key => ["name", "provider", "configured", "source", "keyHint", "metadata", "updatedAt"].includes(key))));
   }
+});
+
+test("organization managers can verify, encrypt, save, test and disconnect workspace API keys without exposing secrets", async (t) => {
+  const stored = new Map();
+  t.mock.method(globalThis, "fetch", async (target) => {
+    const url = new URL(target);
+    if (url.hostname === "generativelanguage.googleapis.com") {
+      return Response.json({ name: "models/gemini-3.1-flash-lite" });
+    }
+    throw new Error("Unexpected provider call: " + url.href);
+  });
+  const app = createApp({
+    env: { ...env, SUPABASE_SERVICE_ROLE_KEY: "service-role-encryption-secret" },
+    clientFactory: () => ({
+      auth: { getUser: async () => ({ data: { user: { id: record } } }) },
+      rpc: async (name, args) => {
+        if (name === "organization_permissions") {
+          return {
+            data: { read: true, write: true, approve: true, manage: true },
+          };
+        }
+        if (name === "save_organization_integration_secret") {
+          stored.set(args.provider_name, {
+            provider: args.provider_name,
+            ciphertext: args.secret_ciphertext,
+            iv: args.secret_iv,
+            auth_tag: args.secret_tag,
+            key_hint: args.masked_hint,
+            metadata: args.public_metadata,
+            updated_at: "2026-11-22T17:50:00Z",
+          });
+          return { data: null, error: null };
+        }
+        if (name === "get_organization_integration_secrets") {
+          return { data: [...stored.values()], error: null };
+        }
+        if (name === "delete_organization_integration_secret") {
+          stored.delete(args.provider_name);
+          return { data: null, error: null };
+        }
+        throw new Error("Unexpected RPC " + name);
+      },
+    }),
+  });
+
+  const secretKey = "AIzaSyTestSecretKeyForWorkspace987654";
+  const connectRes = await request(app)
+    .post("/api/integrations/gemini")
+    .set("Origin", env.APP_URL)
+    .set("Cookie", "ac-access=test-token")
+    .set("x-organization-id", org)
+    .send({ apiKey: secretKey, model: "gemini-3.1-flash-lite" });
+  assert.equal(connectRes.status, 200, connectRes.body.error);
+  assert.equal(connectRes.body.verified, true);
+  assert.equal(connectRes.body.keyHint, "AIza••••7654");
+  assert.equal(JSON.stringify(connectRes.body).includes(secretKey), false);
+  assert.equal(stored.get("gemini").ciphertext.includes(secretKey), false);
+
+  const listRes = await request(app)
+    .get("/api/integrations")
+    .set("Cookie", "ac-access=test-token")
+    .set("x-organization-id", org);
+  assert.equal(listRes.status, 200);
+  const gemini = listRes.body.providers.find((p) => p.provider === "gemini");
+  assert.equal(gemini.configured, true);
+  assert.equal(gemini.source, "workspace");
+  assert.equal(gemini.keyHint, "AIza••••7654");
+  assert.equal(JSON.stringify(listRes.body).includes(secretKey), false);
+
+  const testSavedRes = await request(app)
+    .post("/api/integrations/gemini/test")
+    .set("Origin", env.APP_URL)
+    .set("Cookie", "ac-access=test-token")
+    .set("x-organization-id", org)
+    .send({});
+  assert.equal(testSavedRes.status, 200);
+  assert.equal(testSavedRes.body.verified, true);
+
+  const deleteRes = await request(app)
+    .delete("/api/integrations/gemini")
+    .set("Origin", env.APP_URL)
+    .set("Cookie", "ac-access=test-token")
+    .set("x-organization-id", org)
+    .send({});
+  assert.equal(deleteRes.status, 200);
+  assert.equal(stored.has("gemini"), false);
 });
